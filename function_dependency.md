@@ -370,7 +370,7 @@ Continue with the list until all functions used in each source are listed.
 | rw\.h  | rw\.h   | io\_rw\_cache\_free        | 1         |
 
 ### slist.h
-| Source  | Library / Header              | Function Utilized                        | Time Used |
+| Source  | Library                       | Function Utilized                        | Time Used |
 | ------- | ----------------------------- | ---------------------------------------- | --------- |
 | slist.h | linux/io\_uring\_types.h      | struct io\_wq\_work\_node, io\_wq\_work  | 1         |
 | slist.h | slist.h                       | \_\_wq\_list\_for\_each (macro)          | 1         |
@@ -392,7 +392,7 @@ Continue with the list until all functions used in each source are listed.
 | slist.h | linux/container\_of.h (impl.) | container\_of macro (for wq\_next\_work) | 1         |
 
 ### splice.c
-| Source   | Library / Header         | Function Utilized      | Time Used |
+| Source   | Library                  | Function Utilized      | Time Used |
 | -------- | ------------------------ | ---------------------- | --------- |
 | splice.c | splice.h                 | io\_tee\_prep          | 1         |
 | splice.c | splice.h                 | io\_tee                | 1         |
@@ -412,7 +412,7 @@ Continue with the list until all functions used in each source are listed.
 | splice.c | linux/kernel.h           | likely/unlikely macros | 1         |
 
 ### splice.h
-| Source   | Library / Header          | Function Utilized     | Time Used |
+| Source   | Library                   | Function Utilized     | Time Used |
 | -------- | ------------------------- | --------------------- | --------- |
 | splice.h | splice.h                  | io\_tee\_prep         | 1         |
 | splice.h | splice.h                  | io\_tee               | 1         |
