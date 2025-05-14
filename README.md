@@ -17,3 +17,4 @@ Score is mainly calculated from individual contributions made to the commit. The
 - Daffa Pramudya Ismanto - 1313623051
 - Muhammad Akhsan Araya Choirunnas - 1313623003
 - Muhammad Faathir Arsa - 1313623023
+- Andhika Dwiputra Soetjiadi - 1313623053
