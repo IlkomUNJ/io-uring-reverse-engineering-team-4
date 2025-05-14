@@ -4,6 +4,9 @@ List in this section source and headers of io_uring. For each of the C source/he
 ### Kconfig  
 This configuration file defines build-time options for io_uring features in the Linux kernel. It allows enabling or disabling specific io_uring capabilities during kernel compilation.
 
+### modules,order
+This file specifies the build order of kernel modules for the io_uring subsystem. When modules are built from source, modules.order lists them in the correct sequence to ensure proper dependency resolution and linking. Although it may appear empty if no modules were compiled from io_uring, it is automatically generated during the kernel build process. An empty modules.order simply indicates that no loadable modules were built for io_uring in the current configuration.
+
 ## Source
 ### advice.c
 Store io_madvice & io_fadvice structures, both have the same exact attributes. Which make them basically the same thing. Except function body treat them as separate. Codes which make use of io_madvice are guarded by compilation macro, which make its relevant functions only active if the build flag is set. But functions that make use of io_fadvice are active all the time. The exact difference between io_madvice & io_fadvice will only known after exploring do_madvise function for io_madvice & vfs_fadvise function for io_fadvice. 

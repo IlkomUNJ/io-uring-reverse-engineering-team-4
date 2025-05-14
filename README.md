@@ -15,4 +15,5 @@ Score is mainly calculated from individual contributions made to the commit. The
 
 ## Team Members
 - Daffa Pramudya Ismanto - 1313623051
-- 
+- Muhammad Akhsan Araya Choirunnas - 1313623003
+-
