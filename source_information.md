@@ -188,7 +188,5 @@ Implements futex wait/wake support for io_uring. Handles efficient user-space sy
 ### futex.h
 Declares interfaces for futex support in io_uring. Used for defining futex command handling.
 
-
 ### built-in.a
-Static archive of compiled io_uring object files.
-Linked into the kernel to provide io_uring features.
+Static archive of compiled io_uring object files. Linked into the kernel to provide io_uring features.
