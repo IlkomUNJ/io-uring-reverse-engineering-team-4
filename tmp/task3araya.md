@@ -72,12 +72,17 @@ io_wq      | io_uring/io_wq.c | ulong, free_work_fn, io_wq_work_fn, io_wq_hash, 
 | | | | __io_wq_cpu_online| io_uring/io_wq.c | function parameter
 | | | | io_wq_cpu_online | io_uring/io_wq.c | local variable
 | | | | io_wq_cpu_offline | io_uring/io_wq.c | local variable
+io_wq_hash      | io_uring/io_wq.h | refcount_t, ulong, struct | io_wq_put_hash | io_uring/io_wq.h | function parameter, local variable
 io_provide_buf       | io_uring/kbuf.c | file, __u64, __u32, __u32, __u32, __u32, __u32, __u16 | io_remove_buffers_prep | io_uring/kbuf.c | local variable
 | | | | io_remove_buffers | io_uring/kbuf.c | local variable
 | | | | io_remove_buffers_prep | io_uring/kbuf.c | local variable
 | | | | io_add_buffers | io_uring/kbuf.c | function parameter
 | | | | io_provide_buffers | io_uring/kbuf.c | local variable
 | | | | io_add_buffers | io_uring/kbuf.c | function parameter
+io_buffer_list       | io_uring/kbuf.h | list_head, io_uring_buf_ring, __u16, __u16, __u16, __u16, __u16, __u16, io_mapped_region | io_kbuf_commit | io_uring/kbuf.h | function parameter
+io_buffer       | io_uring/kbuf.h | list_head, __u64, __u32, __u16, __u16 | io_kbuf_commit | io_uring/kbuf.h | function parameter
+buf_sel_arg       | io_uring/kbuf.h | lovec, size_t, size_t, ushort, ushort | io_buffers_select | io_uring/kbuf.h | function parameter
+| | | | io_buffers_peek | io_uring/kbuf.h | function parameter
 io_msg       | io_uring/msg_ring.c | file, file, callback_head, u64, u32, u32, u32, u32, u32, u32 | io_msg_ring_cleanup | io_uring/msg_ring.c | local variable
 | | | | io_msg_data_remote | io_uring/msg_ring.c | function parameter
 | | | | __io_msg_ring_data | io_uring/msg_ring.c | function parameter
@@ -135,7 +140,16 @@ io_sr_msg       | io_uring/net.c | file, compat msghdr, user_msghdr, __user, int
 | | | | io_send_zc | io_uring/net.c | local variable
 | | | | io_sendmsg_zc | io_uring/net.c | local variable
 | | | | io_sendrecv_fail | io_uring/net.c | local variable
+io_async_msghdr        | io_uring/net.h | iou_vec, int, iovec, __kernel_size_t, __kernel_size_t, sockaddr, msghdr, sockaddr_storage | io_netmsg_iovec_free | io_uring/net.c | function parameter
+| | | | io_netmsg_recycle | io_uring/net.c | local variable
+| | | | io_msg_alloc_async | io_uring/net.c | return value, local variable
+| | | | io_mshot_prep_retry | io_uring/net.c | function parameter
+| | | | io_net_import_vec | io_uring/net.c | function parameter
+| | | | io_compat_msg_copy_hdr | io_uring/net.c | function parameter
+| | | | io_msg_copy_hdr | io_uring/net.c | function parameter
 io_recvzc       | io_uring/net.c | file, int, int, uint | io_recvzc_prep | io_uring/net.c | local variable
 | | | | io_recvzc | io_uring/net.c | local variable
 io_nop       | io_uring/nop.c | file, int, int, uint | io_nop_prep | io_uring/nop.c | local variable
 | | | | io_nop | io_uring/nop.c | local variable
+io_notif_data, io_notif_data, uint, bool, bool, bool | io_uring/notif.h | file, ubuf_info, int, uint | io_notif_to_data | io_uring/notif.h | return value
+| | | | io_notif_flush | io_uring/notif.h | local variable
