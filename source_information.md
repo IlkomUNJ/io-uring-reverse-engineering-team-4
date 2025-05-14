@@ -36,25 +36,25 @@ Implements the IORING_NOP operation, providing a placeholder or barrier request 
 Handles asynchronous notification infrastructure for io_uring, including support for linked completion events and zero-copy send notifications. Integrates with kernel signaling mechanisms to track and report deferred operation status.
 
 ### opdef.c  
-Defines various operation types and their corresponding handlers for `io_uring`. It includes the registration of supported operations and their dispatch functions, acting as the central registry for operation types.
+Defines various operation types and their corresponding handlers for io_uring. It includes the registration of supported operations and their dispatch functions, acting as the central registry for operation types.
 
 ### openclose.c  
-Implements file open and close operations for `io_uring`. Handles asynchronous file opening and closing via the `io_uring` interface, efficiently managing the lifecycle of files.
+Implements file open and close operations for io_uring. Handles asynchronous file opening and closing via the io_uring interface, efficiently managing the lifecycle of files.
 
 ### poll.c  
-Provides the implementation of polling operations for `io_uring`. It allows asynchronous monitoring of file descriptors for events, integrating with the kernel’s polling mechanism for efficient event notification.
+Provides the implementation of polling operations for io_uring. It allows asynchronous monitoring of file descriptors for events, integrating with the kernel’s polling mechanism for efficient event notification.
 
 ### register.c  
-Handles resource registration with `io_uring`. Manages the pre-registration of buffers, files, and other resources, optimizing their access through the registration API.
+Handles resource registration with io_uring. Manages the pre-registration of buffers, files, and other resources, optimizing their access through the registration API.
 
 ### rsrc.c  
-Manages resources used in `io_uring` operations. Responsible for resource allocation, tracking, and cleanup, offering abstractions for efficient resource management.
+Manages resources used in io_uring operations. Responsible for resource allocation, tracking, and cleanup, offering abstractions for efficient resource management.
 
 ### rw.c  
-Implements the read and write operations for `io_uring`. Facilitates core data transfer functionality for file I/O with optimizations designed for high-throughput and low-latency operations.
+Implements the read and write operations for io_uring. Facilitates core data transfer functionality for file I/O with optimizations designed for high-throughput and low-latency operations.
 
 ### splice.c  
-Handles splice operations in `io_uring`. Enables efficient data transfer between file descriptors without copying to userspace, supporting zero-copy data movement between pipes and other file descriptors.
+Handles splice operations in io_uring. Enables efficient data transfer between file descriptors without copying to userspace, supporting zero-copy data movement between pipes and other file descriptors.
 
 ## Headers
 ### advice.h
@@ -110,3 +110,85 @@ Defines generic single-linked list data structures used throughout io_uring. Con
 
 ### splice.h
 Declares interfaces for splice operations between file descriptors. Contains definitions for pipe and file splicing parameters. Provides declarations for zero-copy data transfer operations through io_uring.
+
+### advise.h
+Declares functions for asynchronous memory and file advice operations in io_uring. Enables non-blocking madvise and fadvise system calls.
+
+### alloc_cache.c
+Implements memory caching for efficient request allocation. Optimizes reuse of structures to reduce allocation overhead.
+
+### alloc_cache.h
+Declares structures and APIs for allocation caching. Interfaces used by internal io_uring memory managers.
+
+### cancel.c
+Implements logic to cancel in-flight io_uring requests. Handles request lookup, validation, and cancellation safely.
+
+### cancel.h
+Declares cancellation functions and structures. Provides prototypes for use in other io_uring modules.
+
+### epoll.c
+Handles integration of epoll with io_uring operations. Implements event polling and readiness tracking.
+
+### epoll.h
+Declares epoll support functions for io_uring. Interfaces for registering and polling events.
+
+### eventfd.c
+Implements support for eventfd-based notifications. Used for signaling and waking up io_uring users.
+
+Certainly! Here's a clearly separated and concise two-line description for each .c (implementation) and .h (header) file in the io_uring directory, highlighting their distinct roles:
+
+### advise.h
+Declares interfaces for  madvise  and  fadvise in io_uring. Used for asynchronous memory and file advisory operations.
+
+### alloc_cache.c
+Implements memory caching for efficient request allocation. Optimizes reuse of structures to reduce allocation overhead.
+
+### alloc_cache.h
+Declares structures and APIs for allocation caching. Interfaces used by internal io_uring memory managers.
+
+### cancel.c
+Implements logic to cancel in-flight io_uring requests. Handles request lookup, validation, and cancellation safely.
+
+### cancel.h
+Declares cancellation functions and structures. Provides prototypes for use in other io_uring modules.
+
+### epoll.c
+Handles integration of epoll with io_uring operations. Implements event polling and readiness tracking.
+
+### epoll.h
+Declares epoll support functions for io_uring. Interfaces for registering and polling events.
+
+### eventfd.c
+Implements support for eventfd-based notifications. Used for signaling and waking up io_uring users.
+
+### eventfd.h
+Declares eventfd helper functions and types. Provides interfaces for eventfd registration and use.
+
+### fdinfo.c
+Implements proc file descriptor info reporting. Used to expose io_uring details via fdinfo.
+
+### fdinfo.h
+Declares helper functions for populating fdinfo data. Interfaces used in user-space debugging and monitoring.
+
+### filetable.c
+Manages file descriptor tables in io_uring. Tracks file references and ensures safe access.
+
+### filetable.h
+Declares file table management interfaces. Defines functions for table allocation and cleanup.
+
+### fs.c
+Handles filesystem-related io_uring operations. Implements open, statx, and related syscalls.
+
+### fs.h
+Declares file system helper functions and types. Interfaces for handling file-based io_uring commands.
+
+### futex.c
+Implements futex wait/wake support for io_uring. Handles efficient user-space synchronization.
+
+### futex.h
+Declares interfaces for futex support in io_uring. Used for defining futex command handling.
+
+
+### built-in.a
+Static archive of compiled io_uring object files.
+Linked into the kernel to provide io_uring features.
