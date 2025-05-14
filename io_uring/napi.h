@@ -10,11 +10,32 @@
 #ifdef CONFIG_NET_RX_BUSY_POLL
 
 void io_napi_init(struct io_ring_ctx *ctx);
-void io_napi_free(struct io_ring_ctx *ctx);
+/**
+ * This function is responsible for releasing any memory or resources
+ * allocated for the specified io_uring context (`ctx`). It ensures
+ * proper cleanup to prevent resource leaks.
+ */
+
+/**
+ * This function is responsible for releasing any memory or resources
+ * allocated for the specified io_ring_ctx structure. It ensures proper
+ * cleanup to prevent resource leaks.
+ */
+ void io_napi_free(struct io_ring_ctx *ctx);
 
 int io_register_napi(struct io_ring_ctx *ctx, void __user *arg);
+/**
+ * This function is responsible for removing a napi instance associated with the
+ * provided io_uring context. It ensures that the napi instance is properly
+ * unregistered and any associated resources are released.
+ */
 int io_unregister_napi(struct io_ring_ctx *ctx, void __user *arg);
 
+/**
+ * This function is used to link a specific NAPI identifier to an io_uring
+ * context, enabling the integration of NAPI-based networking with io_uring.
+ * It ensures that the napi_id is properly registered within the context.
+ */
 int __io_napi_add_id(struct io_ring_ctx *ctx, unsigned int napi_id);
 
 void __io_napi_busy_loop(struct io_ring_ctx *ctx, struct io_wait_queue *iowq);

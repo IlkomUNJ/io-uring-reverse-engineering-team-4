@@ -97,11 +97,33 @@ struct io_recvzc {
 	struct io_zcrx_ifq		*ifq;
 };
 
+/**
+ * This function takes an iov_iter structure and extracts data from it to populate
+ * a scatter-gather list in the provided socket buffer. It is typically used in
+ * networking or I/O operations where data needs to be transferred efficiently
+ * between user space and kernel space.
+ */
 static int io_sg_from_iter_iovec(struct sk_buff *skb,
 				 struct iov_iter *from, size_t length);
+
+/**
+ * This function takes an iov_iter structure and populates the scatter-gather
+ * list in the provided socket buffer (skb) with the specified length of data.
+ * It is typically used in networking or I/O operations where data needs to be
+ * transferred efficiently using scatter-gather I/O.
+ */
 static int io_sg_from_iter(struct sk_buff *skb,
 			   struct iov_iter *from, size_t length);
 
+/**
+ * This function initializes a shutdown request by extracting the necessary
+ * parameters from the provided submission queue entry (sqe). It validates
+ * that certain fields in the sqe are not set (e.g., off, addr, rw_flags,
+ * buf_index, splice_fd_in) and returns -EINVAL if any of these fields are
+ * non-zero. If the validation passes, it sets the shutdown mode (how) from
+ * the len field of the sqe and marks the request to be forced as asynchronous
+ * by setting the REQ_F_FORCE_ASYNC flag.
+ */
 int io_shutdown_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 {
 	struct io_shutdown *shutdown = io_kiocb_to_cmd(req, struct io_shutdown);
@@ -115,6 +137,12 @@ int io_shutdown_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 	return 0;
 }
 
+/**
+ * This function performs a shutdown operation on a socket associated with
+ * the provided request. It ensures that the file descriptor corresponds to
+ * a valid socket and invokes the appropriate system call to shut down the
+ * socket. The result of the operation is stored in the request's result field.
+ */
 int io_shutdown(struct io_kiocb *req, unsigned int issue_flags)
 {
 	struct io_shutdown *shutdown = io_kiocb_to_cmd(req, struct io_shutdown);

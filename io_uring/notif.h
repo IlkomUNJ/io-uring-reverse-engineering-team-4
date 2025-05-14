@@ -23,10 +23,25 @@ struct io_notif_data {
 	bool			zc_copied;
 };
 
+/**
+ * This function is responsible for allocating and initializing a notification
+ * request (`io_kiocb`) within the given io_uring context (`io_ring_ctx`).
+ */
 struct io_kiocb *io_alloc_notif(struct io_ring_ctx *ctx);
+
+/**
+ * This function is called to finalize the transmission of a user buffer.
+ * It performs necessary cleanup and updates based on the success or failure
+ * of the transmission.
+ */
 void io_tx_ubuf_complete(struct sk_buff *skb, struct ubuf_info *uarg,
 			 bool success);
 
+/**
+ * This inline function takes a pointer to an io_kiocb notification and
+ * converts it to a pointer to an io_notif_data structure. It uses the
+ * io_kiocb_to_cmd macro to perform the conversion.
+ */
 static inline struct io_notif_data *io_notif_to_data(struct io_kiocb *notif)
 {
 	return io_kiocb_to_cmd(notif, struct io_notif_data);

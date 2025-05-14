@@ -57,19 +57,70 @@ struct buf_sel_arg {
 	unsigned short mode;
 };
 
+/**
+ * This function is responsible for selecting an appropriate I/O buffer for
+ * the given request. It may involve operations such as validating the request,
+ * determining the buffer's size, and applying any specified flags. The selected
+ * buffer is returned as a pointer to a user-space memory region.
+ */
 void __user *io_buffer_select(struct io_kiocb *req, size_t *len,
 			      unsigned int issue_flags);
+/**
+ * This function is responsible for selecting an appropriate buffer for the
+ * given I/O request based on the provided arguments and issue flags. It is
+ * typically used in scenarios where buffer management is required for
+ * efficient I/O operations.
+ */
 int io_buffers_select(struct io_kiocb *req, struct buf_sel_arg *arg,
 		      unsigned int issue_flags);
+/**
+ * This function is used to inspect or retrieve information about IO buffers
+ * associated with a specific IO request. It does not modify the buffers but
+ * provides a mechanism to query their state or properties.
+ */
 int io_buffers_peek(struct io_kiocb *req, struct buf_sel_arg *arg);
+/**
+ * This function is responsible for releasing any memory or resources
+ * associated with the registered buffers in the provided io_uring context.
+ * It ensures that all buffers are properly deallocated to prevent memory leaks.
+ */
 void io_destroy_buffers(struct io_ring_ctx *ctx);
 
+/**
+
+ * This function is responsible for setting up the necessary parameters
+ * to handle the removal of previously registered buffers in the io_uring
+ * context. It validates the input parameters and prepares the request
+ * for execution.
+ */
 int io_remove_buffers_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe);
+/**
+ * This function is responsible for cleaning up and removing any buffers
+ * associated with the specified I/O request. The behavior of the removal
+ * process may be influenced by the provided issue_flags.
+ */
 int io_remove_buffers(struct io_kiocb *req, unsigned int issue_flags);
 
+/**
+
+ * This function is responsible for setting up the necessary data structures
+ * and parameters to provide buffers for io_uring operations. It processes
+ * the submission queue entry (SQE) and prepares the request accordingly.
+ */
 int io_provide_buffers_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe);
+/**
+ * This function is responsible for setting up buffers that can be used
+ * for asynchronous I/O operations. It associates the provided buffers
+ * with the given request and applies the specified issue flags.
+ */
 int io_provide_buffers(struct io_kiocb *req, unsigned int issue_flags);
 
+/**
+ * This function associates a user-provided buffer ring with the specified
+ * io_uring context. The buffer ring is used for efficient data transfer
+ * between user space and kernel space. The user must ensure that the
+ * provided buffer ring is properly allocated and accessible.
+ */
 int io_register_pbuf_ring(struct io_ring_ctx *ctx, void __user *arg);
 int io_unregister_pbuf_ring(struct io_ring_ctx *ctx, void __user *arg);
 int io_register_pbuf_status(struct io_ring_ctx *ctx, void __user *arg);

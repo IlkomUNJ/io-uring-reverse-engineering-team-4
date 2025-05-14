@@ -32,6 +32,13 @@ struct io_provide_buf {
 	__u16				bid;
 };
 
+/**
+ * This function processes the buffer ring associated with the given io_buffer_list
+ * and commits the specified length of data. It iterates through the buffers in the
+ * ring, decrementing their lengths and updating their addresses as necessary. If a
+ * buffer's length becomes zero, it moves to the next buffer in the ring by incrementing
+ * the head pointer of the io_buffer_list.
+*/
 static bool io_kbuf_inc_commit(struct io_buffer_list *bl, int len)
 {
 	while (len) {
@@ -51,6 +58,13 @@ static bool io_kbuf_inc_commit(struct io_buffer_list *bl, int len)
 	return true;
 }
 
+/**
+ * This function handles the commit operation for a buffer associated with
+ * an io_kiocb request. It checks if the REQ_F_BUFFERS_COMMIT flag is set
+ * in the request's flags. If the flag is not set, the function returns true
+ * without performing any operation. If the flag is set, it clears the flag
+ * and proceeds with the commit operation.
+ */
 bool io_kbuf_commit(struct io_kiocb *req,
 		    struct io_buffer_list *bl, int len, int nr)
 {
@@ -67,6 +81,11 @@ bool io_kbuf_commit(struct io_kiocb *req,
 	return true;
 }
 
+/**
+ * This function retrieves the buffer list associated with the specified buffer
+ * group ID (bgid) from the io_uring context. It assumes that the uring_lock
+ * is held when this function is called, ensuring thread safety.
+ */
 static inline struct io_buffer_list *io_buffer_get_list(struct io_ring_ctx *ctx,
 							unsigned int bgid)
 {
@@ -75,6 +94,13 @@ static inline struct io_buffer_list *io_buffer_get_list(struct io_ring_ctx *ctx,
 	return xa_load(&ctx->io_bl_xa, bgid);
 }
 
+/**
+ * This function associates a buffer group ID with the given buffer list and
+ * stores it in the io_uring context's buffer list storage. The buffer list is
+ * marked as visible, ensuring proper handling during lookups, especially from
+ * mmap operations. The function ensures thread safety by acquiring the
+ * mmap_lock mutex before performing the operation.
+ */
 static int io_buffer_add_list(struct io_ring_ctx *ctx,
 			      struct io_buffer_list *bl, unsigned int bgid)
 {
@@ -88,6 +114,17 @@ static int io_buffer_add_list(struct io_ring_ctx *ctx,
 	return xa_err(xa_store(&ctx->io_bl_xa, bgid, bl, GFP_KERNEL));
 }
 
+/**
+ * This function is responsible for releasing a legacy kernel buffer that was
+ * previously selected for the given request. It performs the following steps:
+ * 1. Checks if the REQ_F_BUFFER_SELECTED flag is set in the request's flags.
+ *    If not, it triggers a warning and exits early.
+ * 2. Updates the request's buffer index (buf_index) with the buffer group ID
+ *    (bgid) of the associated kernel buffer.
+ * 3. Clears the REQ_F_BUFFER_SELECTED flag from the request's flags.
+ * 4. Frees the memory allocated for the kernel buffer (kbuf) and sets the
+ *    pointer to NULL to prevent further access.
+ */
 void io_kbuf_drop_legacy(struct io_kiocb *req)
 {
 	if (WARN_ON_ONCE(!(req->flags & REQ_F_BUFFER_SELECTED)))
@@ -98,6 +135,18 @@ void io_kbuf_drop_legacy(struct io_kiocb *req)
 	req->kbuf = NULL;
 }
 
+/**
+ * This function recycles a kernel buffer associated with a request back to
+ * its corresponding buffer list in the io_ring_ctx. It ensures proper locking
+ * during the operation to maintain thread safety. The function performs the
+ * following steps:
+ * 1. Acquires the submission lock for the io_ring_ctx.
+ * 2. Retrieves the buffer and its associated buffer list using the buffer group ID (bgid).
+ * 3. Adds the buffer back to the buffer list.
+ * 4. Clears the REQ_F_BUFFER_SELECTED flag from the request.
+ * 5. Updates the request's buffer index to the buffer group ID.
+ * 6. Releases the submission lock.
+ */
 bool io_kbuf_recycle_legacy(struct io_kiocb *req, unsigned issue_flags)
 {
 	struct io_ring_ctx *ctx = req->ctx;
@@ -116,6 +165,14 @@ bool io_kbuf_recycle_legacy(struct io_kiocb *req, unsigned issue_flags)
 	return true;
 }
 
+/**
+
+ * This function selects a buffer from the provided buffer list for the given
+ * I/O request. If the buffer list is not empty, it retrieves the first buffer
+ * from the list, removes it from the list, and updates the request's fields
+ * accordingly. The function also ensures that the buffer size does not exceed
+ * the requested size and sets appropriate flags in the request structure.
+ */
 static void __user *io_provided_buffer_select(struct io_kiocb *req, size_t *len,
 					      struct io_buffer_list *bl)
 {
@@ -136,6 +193,14 @@ static void __user *io_provided_buffer_select(struct io_kiocb *req, size_t *len,
 	return NULL;
 }
 
+/**
+
+ * This function selects a buffer from the provided buffer list for an I/O
+ * operation. It uses the io_provided_buffer_select helper function to retrieve
+ * the buffer. If no buffer is available, it returns -ENOBUFS. Otherwise, it
+ * sets the iov_base and iov_len fields of the provided iovec structure to the
+ * base address and length of the selected buffer, respectively, and returns 1.
+ */
 static int io_provided_buffers_select(struct io_kiocb *req, size_t *len,
 				      struct io_buffer_list *bl,
 				      struct iovec *iov)
@@ -151,6 +216,12 @@ static int io_provided_buffers_select(struct io_kiocb *req, size_t *len,
 	return 1;
 }
 
+/**
+ * This function selects a buffer from the provided io_uring buffer ring
+ * based on the current head and tail indices. It ensures that the buffer
+ * is valid and updates the request structure with relevant information
+ * about the selected buffer.
+ */
 static void __user *io_ring_buffer_select(struct io_kiocb *req, size_t *len,
 					  struct io_buffer_list *bl,
 					  unsigned int issue_flags)

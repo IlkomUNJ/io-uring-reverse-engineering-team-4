@@ -11,6 +11,10 @@
 
 static const struct ubuf_info_ops io_ubuf_ops;
 
+/**
+ * This function processes and completes a notification work task. It iterates
+ * through the linked list of notification data structures, 
+ */
 static void io_notif_tw_complete(struct io_kiocb *notif, io_tw_token_t tw)
 {
 	struct io_notif_data *nd = io_notif_to_data(notif);
@@ -33,6 +37,13 @@ static void io_notif_tw_complete(struct io_kiocb *notif, io_tw_token_t tw)
 	} while (nd);
 }
 
+/**
+ * This function handles the completion of a user buffer transmission. It updates
+ * the zero-copy (zc) status flags in the io_notif_data structure based on the
+ * success or failure of the transmission. If the reference count of the user
+ * buffer reaches zero, it proceeds to handle the completion of the notification
+ * request associated with the transmission.
+ */
 void io_tx_ubuf_complete(struct sk_buff *skb, struct ubuf_info *uarg,
 			 bool success)
 {
@@ -60,6 +71,12 @@ void io_tx_ubuf_complete(struct sk_buff *skb, struct ubuf_info *uarg,
 	__io_req_task_work_add(notif, tw_flags);
 }
 
+/**
+ * This function links a socket buffer (skb) to a notification structure
+ * represented by `struct io_notif_data`. It ensures that the skb is properly
+ * initialized for zero-copy operations and validates the conditions for linking
+ * notifications.
+ */
 static int io_link_skb(struct sk_buff *skb, struct ubuf_info *uarg)
 {
 	struct io_notif_data *nd, *prev_nd;
@@ -99,11 +116,24 @@ static int io_link_skb(struct sk_buff *skb, struct ubuf_info *uarg)
 	return 0;
 }
 
+/**
+ * This structure is used to define the operations associated with user buffer
+ * information in the context of io_uring. The `complete` function is called
+ * when the user buffer operation is completed, and the `link_skb` function
+ * is used to associate a socket buffer with the user buffer.
+ */
 static const struct ubuf_info_ops io_ubuf_ops = {
 	.complete = io_tx_ubuf_complete,
 	.link_skb = io_link_skb,
 };
 
+/**
+ * This function allocates a new io_kiocb structure for a notification request
+ * and initializes its fields. It sets up the notification request with default
+ * values and prepares it for use in the io_uring framework. The function also
+ * initializes the associated io_notif_data structure and sets up user buffer
+ * operations and reference counting.
+ */
 struct io_kiocb *io_alloc_notif(struct io_ring_ctx *ctx)
 	__must_hold(&ctx->uring_lock)
 {
