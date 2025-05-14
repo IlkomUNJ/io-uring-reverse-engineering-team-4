@@ -3,6 +3,19 @@
 # io_uring configuration
 #
 
+"""
+This configuration file defines the `IO_URING_ZCRX` kernel configuration option.
+
+- `IO_URING_ZCRX`: A boolean configuration option that is enabled by default (`def_bool y`).
+- Dependencies:
+	- `IO_URING`: Requires the IO_URING subsystem to be enabled.
+	- `PAGE_POOL`: Depends on the page pool memory management subsystem.
+	- `INET`: Requires the INET (Internet Protocol) subsystem.
+	- `NET_RX_BUSY_POLL`: Depends on the network receive busy polling feature.
+
+This configuration is part of the io_uring subsystem and is used to enable
+specific features related to zero-copy receive (ZCRX) functionality in the kernel.
+"""
 config IO_URING_ZCRX
 	def_bool y
 	depends on IO_URING

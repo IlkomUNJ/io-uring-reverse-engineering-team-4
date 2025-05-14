@@ -31,18 +31,55 @@ static inline void io_poll_multishot_retry(struct io_kiocb *req)
 {
 	atomic_inc(&req->poll_refs);
 }
-
+ 
+ /*
+  * Prepares a poll add request by initializing the necessary fields in the request.
+  * Returns 0 on success or an error code on failure.
+  */
 int io_poll_add_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe);
+ 
+ /*
+  * Adds a poll request to monitor events on a file descriptor.
+  * Returns 0 on success or an error code on failure.
+  */
 int io_poll_add(struct io_kiocb *req, unsigned int issue_flags);
-
+ 
+ /*
+  * Prepares a poll remove request by validating the request and initializing fields.
+  * Returns 0 on success or an error code on failure.
+  */
 int io_poll_remove_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe);
+ 
+ /*
+  * Removes a poll request, stopping the monitoring of events on a file descriptor.
+  * Returns 0 on success or an error code on failure.
+  */
 int io_poll_remove(struct io_kiocb *req, unsigned int issue_flags);
-
+ 
 struct io_cancel_data;
+/*
+  * Cancels a poll request based on the provided cancel data.
+  * Returns 0 on success or an error code on failure.
+  */
 int io_poll_cancel(struct io_ring_ctx *ctx, struct io_cancel_data *cd,
-		   unsigned issue_flags);
+			unsigned issue_flags);
+ 
+ /*
+  * Arms a poll handler to monitor events for a specific request.
+  * Returns 0 on success or an error code on failure.
+  */
 int io_arm_poll_handler(struct io_kiocb *req, unsigned issue_flags);
+ 
+ /*
+  * Removes all poll requests associated with a specific task context.
+  * If cancel_all is true, all requests are canceled.
+  * Returns true if any requests were removed, false otherwise.
+  */
 bool io_poll_remove_all(struct io_ring_ctx *ctx, struct io_uring_task *tctx,
 			bool cancel_all);
-
+ 
+ /*
+  * Handles poll-related tasks for a specific request.
+  * This function is executed as part of the task work mechanism.
+  */
 void io_poll_task_func(struct io_kiocb *req, io_tw_token_t tw);

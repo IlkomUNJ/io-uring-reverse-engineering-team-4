@@ -35,6 +35,20 @@
 #define IORING_MAX_RESTRICTIONS	(IORING_RESTRICTION_LAST + \
 				 IORING_REGISTER_LAST + IORING_OP_LAST)
 
+/**
+ * io_probe - Probes the io_uring context for specific capabilities or features.
+ *
+ * @ctx: Pointer to the io_ring_ctx structure representing the io_uring context.
+ * @arg: User-space pointer to the argument data for the probe operation.
+ * @nr_args: Number of arguments provided for the probe operation.
+ *
+ * This function is marked as __cold, indicating that it is unlikely to be
+ * executed frequently. It is used to query or validate specific features
+ * or capabilities of the io_uring context.
+ *
+ * Return:
+ *   0 on success, or a negative error code on failure.
+ */
 static __cold int io_probe(struct io_ring_ctx *ctx, void __user *arg,
 			   unsigned nr_args)
 {
@@ -74,6 +88,18 @@ out:
 	return ret;
 }
 
+/**
+ * io_unregister_personality - Unregisters a personality from the io_uring context.
+ * @ctx: Pointer to the io_uring context structure.
+ * @id: The ID of the personality to unregister.
+ *
+ * This function removes a previously registered personality from the io_uring
+ * context, identified by the given ID. Personalities are used to associate
+ * specific task credentials with operations in io_uring.
+ *
+ * Returns:
+ * 0 on success, or a negative error code on failure.
+ */
 int io_unregister_personality(struct io_ring_ctx *ctx, unsigned id)
 {
 	const struct cred *creds;
@@ -87,7 +113,18 @@ int io_unregister_personality(struct io_ring_ctx *ctx, unsigned id)
 	return -EINVAL;
 }
 
-
+/**
+ * io_register_personality - Registers a personality for the io_uring context.
+ * @ctx: Pointer to the io_uring context structure.
+ *
+ * This function is responsible for registering a personality within the
+ * specified io_uring context. A personality in io_uring allows associating
+ * specific task credentials with operations submitted to the ring, enabling
+ * operations to execute with the permissions of the registered personality.
+ *
+ * Returns:
+ *   0 on success, or a negative error code on failure.
+ */
 static int io_register_personality(struct io_ring_ctx *ctx)
 {
 	const struct cred *creds;
@@ -105,6 +142,24 @@ static int io_register_personality(struct io_ring_ctx *ctx)
 	return id;
 }
 
+/**
+ * io_parse_restrictions - Parses and applies I/O restrictions.
+ *
+ * @arg: A pointer to user-provided data containing restriction details.
+ * @nr_args: The number of restriction arguments provided.
+ * @restrictions: A pointer to the structure where parsed restrictions will be stored.
+ *
+ * This function processes the user-provided restrictions for I/O operations
+ * and populates the provided restrictions structure. It ensures that the
+ * restrictions are correctly parsed and validated before being applied.
+ *
+ * Return:
+ *   0 on success, or a negative error code on failure.
+ *
+ * Note:
+ *   This function is marked as __cold, indicating that it is unlikely to be
+ *   executed frequently and may be optimized for size rather than speed.
+ */
 static __cold int io_parse_restrictions(void __user *arg, unsigned int nr_args,
 					struct io_restriction *restrictions)
 {
@@ -155,6 +210,21 @@ err:
 	return ret;
 }
 
+/**
+ * io_register_restrictions - Registers restrictions for an io_uring context.
+ * 
+ * @ctx: Pointer to the io_ring_ctx structure representing the io_uring context.
+ * @arg: User-space pointer to the restrictions data.
+ * @nr_args: Number of restriction arguments provided.
+ * 
+ * This function is responsible for registering restrictions for the specified
+ * io_uring context. Restrictions define the operations or behaviors that are
+ * allowed or disallowed within the io_uring instance. The restrictions data
+ * is passed from user space and validated before being applied.
+ * 
+ * Return:
+ *   0 on success, or a negative error code on failure.
+ */
 static __cold int io_register_restrictions(struct io_ring_ctx *ctx,
 					   void __user *arg, unsigned int nr_args)
 {
@@ -177,6 +247,17 @@ static __cold int io_register_restrictions(struct io_ring_ctx *ctx,
 	return ret;
 }
 
+/**
+ * io_register_enable_rings - Enables the rings for the given io_uring context.
+ * 
+ * @ctx: Pointer to the io_ring_ctx structure representing the io_uring context.
+ * 
+ * This function is responsible for enabling the submission and completion
+ * rings associated with the provided io_uring context. It ensures that the
+ * necessary resources are initialized and ready for use.
+ * 
+ * Return: Returns 0 on success or a negative error code on failure.
+ */
 static int io_register_enable_rings(struct io_ring_ctx *ctx)
 {
 	if (!(ctx->flags & IORING_SETUP_R_DISABLED))
@@ -201,6 +282,19 @@ static int io_register_enable_rings(struct io_ring_ctx *ctx)
 	return 0;
 }
 
+/**
+ * __io_register_iowq_aff - Registers a new CPU affinity mask for the io_uring workqueue.
+ * 
+ * @ctx: Pointer to the io_ring_ctx structure representing the io_uring context.
+ * @new_mask: The new CPU mask to be applied for the io_uring workqueue.
+ * 
+ * This function is marked as __cold, indicating that it is unlikely to be called
+ * frequently and may be placed in a less performance-critical section of the code.
+ * It updates the CPU affinity for the io_uring workqueue to the specified mask.
+ * 
+ * Return:
+ * 0 on success, or a negative error code on failure.
+ */
 static __cold int __io_register_iowq_aff(struct io_ring_ctx *ctx,
 					 cpumask_var_t new_mask)
 {
@@ -217,6 +311,21 @@ static __cold int __io_register_iowq_aff(struct io_ring_ctx *ctx,
 	return ret;
 }
 
+/**
+ * io_register_iowq_aff - Registers IO worker queue affinity for the io_uring context.
+ *
+ * @ctx: Pointer to the io_ring_ctx structure representing the io_uring context.
+ * @arg: User-space pointer to the data containing affinity settings.
+ * @len: Length of the data pointed to by @arg.
+ *
+ * This function is marked as __cold, indicating that it is unlikely to be called
+ * frequently. It is used to configure the affinity of IO worker threads for a
+ * specific io_uring context, allowing fine-grained control over thread placement
+ * and CPU usage.
+ *
+ * Returns:
+ * 0 on success, or a negative error code on failure.
+ */
 static __cold int io_register_iowq_aff(struct io_ring_ctx *ctx,
 				       void __user *arg, unsigned len)
 {
@@ -249,6 +358,18 @@ static __cold int io_register_iowq_aff(struct io_ring_ctx *ctx,
 	return ret;
 }
 
+/**
+ * io_unregister_iowq_aff - Unregisters the I/O worker queue affinity for the given context.
+ * 
+ * @ctx: Pointer to the io_ring_ctx structure representing the I/O ring context.
+ * 
+ * This function removes the I/O worker queue affinity settings for the specified
+ * I/O ring context by calling the internal helper function __io_register_iowq_aff
+ * with a NULL affinity parameter. It is marked as __cold, indicating that it is
+ * unlikely to be executed frequently.
+ * 
+ * Return: Returns the result of the __io_register_iowq_aff function call.
+ */
 static __cold int io_unregister_iowq_aff(struct io_ring_ctx *ctx)
 {
 	return __io_register_iowq_aff(ctx, NULL);
@@ -581,6 +702,20 @@ out:
 	return ret;
 }
 
+/**
+ * io_register_mem_region - Registers a memory region for use with io_uring.
+ * @ctx: Pointer to the io_ring_ctx structure representing the io_uring context.
+ * @uarg: User-space pointer to the memory region to be registered.
+ *
+ * This function is responsible for registering a memory region with the
+ * io_uring context, allowing the kernel to access and manage the memory
+ * for asynchronous I/O operations. The memory region is provided by the
+ * user-space application via the @uarg parameter.
+ *
+ * Return:
+ * On success, returns 0. On failure, returns a negative error code
+ * indicating the type of error encountered.
+ */
 static int io_register_mem_region(struct io_ring_ctx *ctx, void __user *uarg)
 {
 	struct io_uring_mem_region_reg __user *reg_uptr = uarg;
@@ -626,6 +761,23 @@ static int io_register_mem_region(struct io_ring_ctx *ctx, void __user *uarg)
 	return 0;
 }
 
+/**
+ * __io_uring_register - Handles the core logic for io_uring registration operations.
+ *
+ * This function processes various io_uring registration operations, such as
+ * registering buffers, files, eventfds, personalities, and other resources.
+ * It validates the input parameters, performs the requested operation, and
+ * ensures proper synchronization using the io_uring context lock.
+ *
+ * @ctx: The io_uring context associated with the operation.
+ * @opcode: The registration operation to be performed.
+ * @arg: A pointer to user-provided data for the operation.
+ * @nr_args: The number of arguments or size of the data provided.
+ *
+ * Returns:
+ * - 0 on success.
+ * - Negative error code on failure.
+ */
 static int __io_uring_register(struct io_ring_ctx *ctx, unsigned opcode,
 			       void __user *arg, unsigned nr_args)
 	__releases(ctx->uring_lock)
@@ -845,6 +997,21 @@ static int __io_uring_register(struct io_ring_ctx *ctx, unsigned opcode,
  * true, then the registered index is used. Otherwise, the normal fd table.
  * Caller must call fput() on the returned file, unless it's an ERR_PTR.
  */
+/**
+ * io_uring_register_get_file - Retrieves a file pointer for a given fd.
+ *
+ * This function retrieves the file pointer associated with a given file
+ * descriptor (fd). If the fd is registered via IORING_REGISTER_RING_FDS,
+ * it retrieves the file from the task's private array. Otherwise, it uses
+ * the standard file descriptor table.
+ *
+ * @fd: The file descriptor to retrieve.
+ * @registered: Indicates whether the fd is registered via IORING_REGISTER_RING_FDS.
+ *
+ * Returns:
+ * - A pointer to the file structure on success.
+ * - ERR_PTR with a negative error code on failure.
+ */
 struct file *io_uring_register_get_file(unsigned int fd, bool registered)
 {
 	struct file *file;
@@ -878,6 +1045,21 @@ struct file *io_uring_register_get_file(unsigned int fd, bool registered)
  * "blind" registration opcodes are ones where there's no ring given, and
  * hence the source fd must be -1.
  */
+/**
+ * io_uring_register_blind - Handles "blind" registration opcodes.
+ *
+ * This function processes registration opcodes that do not require an
+ * io_uring context or ring, such as IORING_REGISTER_SEND_MSG_RING.
+ * It validates the input parameters and performs the requested operation.
+ *
+ * @opcode: The registration operation to be performed.
+ * @arg: A pointer to user-provided data for the operation.
+ * @nr_args: The number of arguments or size of the data provided.
+ *
+ * Returns:
+ * - 0 on success.
+ * - Negative error code on failure.
+ */
 static int io_uring_register_blind(unsigned int opcode, void __user *arg,
 				   unsigned int nr_args)
 {
@@ -900,6 +1082,23 @@ static int io_uring_register_blind(unsigned int opcode, void __user *arg,
 	return -EINVAL;
 }
 
+/**
+ * SYSCALL_DEFINE4(io_uring_register) - System call for io_uring registration.
+ *
+ * This system call allows user-space applications to register various resources
+ * with an io_uring instance, such as buffers, files, eventfds, and more. It
+ * validates the input parameters, retrieves the io_uring context, and invokes
+ * the appropriate registration handler.
+ *
+ * @fd: The file descriptor of the io_uring instance.
+ * @opcode: The registration operation to be performed.
+ * @arg: A pointer to user-provided data for the operation.
+ * @nr_args: The number of arguments or size of the data provided.
+ *
+ * Returns:
+ * - 0 on success.
+ * - Negative error code on failure.
+ */
 SYSCALL_DEFINE4(io_uring_register, unsigned int, fd, unsigned int, opcode,
 		void __user *, arg, unsigned int, nr_args)
 {

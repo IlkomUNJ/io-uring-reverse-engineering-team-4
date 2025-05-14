@@ -24,6 +24,20 @@ struct io_splice {
 	struct io_rsrc_node		*rsrc_node;
 };
 
+/**
+ * __io_splice_prep - Prepares a splice request for io_uring.
+ *
+ * @req: Pointer to the io_kiocb structure representing the request.
+ * @sqe: Pointer to the io_uring submission queue entry.
+ *
+ * This function initializes the necessary parameters for a splice request
+ * based on the submission queue entry (SQE). It validates the input flags
+ * and sets up the splice operation.
+ *
+ * Returns:
+ * - 0 on success.
+ * - Negative error code on failure.
+ */
 static int __io_splice_prep(struct io_kiocb *req,
 			    const struct io_uring_sqe *sqe)
 {
@@ -40,6 +54,20 @@ static int __io_splice_prep(struct io_kiocb *req,
 	return 0;
 }
 
+/**
+ * io_tee_prep - Prepares a tee request for io_uring.
+ *
+ * @req: Pointer to the io_kiocb structure representing the request.
+ * @sqe: Pointer to the io_uring submission queue entry.
+ *
+ * This function prepares a tee operation, which duplicates data from one
+ * pipe to another without consuming it. It validates the input parameters
+ * and initializes the request.
+ *
+ * Returns:
+ * - 0 on success.
+ * - Negative error code on failure.
+ */
 int io_tee_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 {
 	if (READ_ONCE(sqe->splice_off_in) || READ_ONCE(sqe->off))
@@ -47,6 +75,14 @@ int io_tee_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 	return __io_splice_prep(req, sqe);
 }
 
+/**
+ * io_splice_cleanup - Cleans up resources for a splice request.
+ *
+ * @req: Pointer to the io_kiocb structure representing the request.
+ *
+ * This function releases resources associated with a splice request,
+ * such as decrementing the reference count of the resource node.
+ */
 void io_splice_cleanup(struct io_kiocb *req)
 {
 	struct io_splice *sp = io_kiocb_to_cmd(req, struct io_splice);
@@ -55,6 +91,21 @@ void io_splice_cleanup(struct io_kiocb *req)
 		io_put_rsrc_node(req->ctx, sp->rsrc_node);
 }
 
+/**
+ * io_splice_get_file - Retrieves the input file for a splice operation.
+ *
+ * @req: Pointer to the io_kiocb structure representing the request.
+ * @issue_flags: Flags indicating the context in which the operation is issued.
+ *
+ * This function retrieves the input file for a splice operation. If the
+ * SPLICE_F_FD_IN_FIXED flag is set, it retrieves the file from the fixed
+ * file table. Otherwise, it retrieves the file using the normal file
+ * descriptor table.
+ *
+ * Returns:
+ * - Pointer to the file structure on success.
+ * - NULL on failure.
+ */
 static struct file *io_splice_get_file(struct io_kiocb *req,
 				       unsigned int issue_flags)
 {
@@ -78,6 +129,20 @@ static struct file *io_splice_get_file(struct io_kiocb *req,
 	return file;
 }
 
+/**
+ * io_tee - Handles a tee operation for io_uring.
+ *
+ * @req: Pointer to the io_kiocb structure representing the request.
+ * @issue_flags: Flags indicating the context in which the operation is issued.
+ *
+ * This function processes a tee operation, which duplicates data from one
+ * pipe to another without consuming it. It performs the operation and sets
+ * the result in the request.
+ *
+ * Returns:
+ * - IOU_OK on success.
+ * - Negative error code on failure.
+ */
 int io_tee(struct io_kiocb *req, unsigned int issue_flags)
 {
 	struct io_splice *sp = io_kiocb_to_cmd(req, struct io_splice);
@@ -106,6 +171,20 @@ done:
 	return IOU_OK;
 }
 
+/**
+ * io_splice_prep - Prepares a splice request for io_uring.
+ *
+ * @req: Pointer to the io_kiocb structure representing the request.
+ * @sqe: Pointer to the io_uring submission queue entry.
+ *
+ * This function prepares a splice operation, which transfers data between
+ * two file descriptors. It initializes the necessary parameters for the
+ * operation.
+ *
+ * Returns:
+ * - 0 on success.
+ * - Negative error code on failure.
+ */
 int io_splice_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 {
 	struct io_splice *sp = io_kiocb_to_cmd(req, struct io_splice);
@@ -115,6 +194,20 @@ int io_splice_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 	return __io_splice_prep(req, sqe);
 }
 
+/**
+ * io_splice - Handles a splice operation for io_uring.
+ *
+ * @req: Pointer to the io_kiocb structure representing the request.
+ * @issue_flags: Flags indicating the context in which the operation is issued.
+ *
+ * This function processes a splice operation, which transfers data between
+ * two file descriptors. It performs the operation and sets the result in
+ * the request.
+ *
+ * Returns:
+ * - IOU_OK on success.
+ * - Negative error code on failure.
+ */
 int io_splice(struct io_kiocb *req, unsigned int issue_flags)
 {
 	struct io_splice *sp = io_kiocb_to_cmd(req, struct io_splice);
