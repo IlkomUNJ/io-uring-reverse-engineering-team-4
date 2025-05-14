@@ -16,6 +16,7 @@
 #include "rsrc.h"
 
 #ifdef CONFIG_PROC_FS
+// Show credentials associated with a specific user ID in a sequence file format
 static __cold int io_uring_show_cred(struct seq_file *m, unsigned int id,
 		const struct cred *cred)
 {
@@ -47,6 +48,7 @@ static __cold int io_uring_show_cred(struct seq_file *m, unsigned int id,
 }
 
 #ifdef CONFIG_NET_RX_BUSY_POLL
+// Displays information about NAPI (New API) settings, including busy polling and tracking mode
 static __cold void common_tracking_show_fdinfo(struct io_ring_ctx *ctx,
 					       struct seq_file *m,
 					       const char *tracking_strategy)
@@ -60,6 +62,7 @@ static __cold void common_tracking_show_fdinfo(struct io_ring_ctx *ctx,
 		seq_puts(m, "napi_prefer_busy_poll:\tfalse\n");
 }
 
+// Displays NAPI tracking information based on the current mode (inactive, dynamic, or static)
 static __cold void napi_show_fdinfo(struct io_ring_ctx *ctx,
 				    struct seq_file *m)
 {
@@ -90,6 +93,7 @@ static inline void napi_show_fdinfo(struct io_ring_ctx *ctx,
  * Caller holds a reference to the file already, we don't need to do
  * anything else to get an extra reference.
  */
+// Shows detailed information about the IO uring context, including submission and completion queue status, thread information, and user buffers
 __cold void io_uring_show_fdinfo(struct seq_file *m, struct file *file)
 {
 	struct io_ring_ctx *ctx = file->private_data;

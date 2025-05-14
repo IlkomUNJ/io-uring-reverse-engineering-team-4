@@ -34,6 +34,19 @@ struct io_rw {
 	rwf_t				flags;
 };
 
+/**
+ * io_file_supports_nowait - Checks if a file supports non-blocking I/O.
+ *
+ * @req: Pointer to the io_kiocb structure representing the request.
+ * @mask: Poll mask to check for readiness.
+ *
+ * This function determines if a file supports non-blocking I/O by checking
+ * the FMODE_NOWAIT flag or polling the file for readiness.
+ *
+ * Returns:
+ * - true if the file supports non-blocking I/O.
+ * - false otherwise.
+ */
 static bool io_file_supports_nowait(struct io_kiocb *req, __poll_t mask)
 {
 	/* If FMODE_NOWAIT is set for a file, we're golden */
@@ -60,6 +73,18 @@ static int io_iov_compat_buffer_select_prep(struct io_rw *rw)
 	return 0;
 }
 
+/**
+ * io_iov_buffer_select_prep - Prepares a buffer for selection.
+ *
+ * @req: Pointer to the io_kiocb structure representing the request.
+ *
+ * This function prepares a buffer for selection by validating the buffer
+ * length and copying the iovec structure from user space.
+ *
+ * Returns:
+ * - 0 on success.
+ * - Negative error code on failure.
+ */
 static int io_iov_buffer_select_prep(struct io_kiocb *req)
 {
 	struct iovec __user *uiov;
@@ -79,6 +104,22 @@ static int io_iov_buffer_select_prep(struct io_kiocb *req)
 	return 0;
 }
 
+/**
+ * io_import_vec - Imports an iovec structure for I/O operations.
+ *
+ * @ddir: Direction of the data transfer (read or write).
+ * @req: Pointer to the io_kiocb structure representing the request.
+ * @io: Pointer to the io_async_rw structure for asynchronous I/O.
+ * @uvec: Pointer to the user-provided iovec array.
+ * @uvec_segs: Number of segments in the iovec array.
+ *
+ * This function imports an iovec structure from user space and prepares it
+ * for use in I/O operations.
+ *
+ * Returns:
+ * - 0 on success.
+ * - Negative error code on failure.
+ */
 static int io_import_vec(int ddir, struct io_kiocb *req,
 			 struct io_async_rw *io,
 			 const struct iovec __user *uvec,
@@ -142,6 +183,15 @@ static inline int io_import_rw_buffer(int rw, struct io_kiocb *req,
 	return 0;
 }
 
+/**
+ * io_rw_recycle - Recycles an asynchronous read/write structure.
+ *
+ * @req: Pointer to the io_kiocb structure representing the request.
+ * @issue_flags: Flags indicating the context in which the operation is issued.
+ *
+ * This function recycles an asynchronous read/write structure by releasing
+ * its resources and returning it to the cache.
+ */
 static void io_rw_recycle(struct io_kiocb *req, unsigned int issue_flags)
 {
 	struct io_async_rw *rw = req->async_data;
@@ -194,6 +244,18 @@ static void io_req_rw_cleanup(struct io_kiocb *req, unsigned int issue_flags)
 	}
 }
 
+/**
+ * io_rw_alloc_async - Allocates an asynchronous read/write structure.
+ *
+ * @req: Pointer to the io_kiocb structure representing the request.
+ *
+ * This function allocates an asynchronous read/write structure for the
+ * specified request.
+ *
+ * Returns:
+ * - 0 on success.
+ * - Negative error code on failure.
+ */
 static int io_rw_alloc_async(struct io_kiocb *req)
 {
 	struct io_ring_ctx *ctx = req->ctx;
@@ -308,6 +370,20 @@ static int io_rw_do_import(struct io_kiocb *req, int ddir)
 	return io_import_rw_buffer(ddir, req, req->async_data, 0);
 }
 
+/**
+ * io_prep_rw - Prepares a read or write request for io_uring.
+ *
+ * @req: Pointer to the io_kiocb structure representing the request.
+ * @sqe: Pointer to the io_uring submission queue entry.
+ * @ddir: Direction of the data transfer (read or write).
+ *
+ * This function initializes the necessary parameters for a read or write
+ * request based on the submission queue entry (SQE).
+ *
+ * Returns:
+ * - 0 on success.
+ * - Negative error code on failure.
+ */
 static int io_prep_rw(struct io_kiocb *req, const struct io_uring_sqe *sqe,
 		      int ddir)
 {
@@ -1009,6 +1085,19 @@ done:
 	return ret;
 }
 
+/**
+ * io_read - Handles a read operation for io_uring.
+ *
+ * @req: Pointer to the io_kiocb structure representing the request.
+ * @issue_flags: Flags indicating the context in which the operation is issued.
+ *
+ * This function processes a read request, including preparing the request,
+ * importing buffers, and performing the read operation.
+ *
+ * Returns:
+ * - IOU_OK on success.
+ * - Negative error code on failure.
+ */
 int io_read(struct io_kiocb *req, unsigned int issue_flags)
 {
 	int ret;
@@ -1105,6 +1194,19 @@ static bool io_kiocb_start_write(struct io_kiocb *req, struct kiocb *kiocb)
 	return ret;
 }
 
+/**
+ * io_write - Handles a write operation for io_uring.
+ *
+ * @req: Pointer to the io_kiocb structure representing the request.
+ * @issue_flags: Flags indicating the context in which the operation is issued.
+ *
+ * This function processes a write request, including preparing the request,
+ * importing buffers, and performing the write operation.
+ *
+ * Returns:
+ * - IOU_OK on success.
+ * - Negative error code on failure.
+ */
 int io_write(struct io_kiocb *req, unsigned int issue_flags)
 {
 	bool force_nonblock = issue_flags & IO_URING_F_NONBLOCK;
@@ -1223,6 +1325,14 @@ int io_write_fixed(struct io_kiocb *req, unsigned int issue_flags)
 	return io_write(req, issue_flags);
 }
 
+/**
+ * io_rw_fail - Handles a failed read/write request.
+ *
+ * @req: Pointer to the io_kiocb structure representing the request.
+ *
+ * This function sets the result of a failed read/write request and marks
+ * the request as failed.
+ */
 void io_rw_fail(struct io_kiocb *req)
 {
 	int res;
@@ -1303,6 +1413,19 @@ static int io_uring_hybrid_poll(struct io_kiocb *req,
 	return ret;
 }
 
+/**
+ * io_do_iopoll - Performs I/O polling for io_uring.
+ *
+ * @ctx: Pointer to the io_ring_ctx structure representing the io_uring context.
+ * @force_nonspin: Flag indicating whether to force non-spinning polling.
+ *
+ * This function performs I/O polling for io_uring, processing completed
+ * requests and handling retries if necessary.
+ *
+ * Returns:
+ * - The number of events processed on success.
+ * - Negative error code on failure.
+ */
 int io_do_iopoll(struct io_ring_ctx *ctx, bool force_nonspin)
 {
 	struct io_wq_work_node *pos, *start, *prev;
@@ -1375,6 +1498,14 @@ int io_do_iopoll(struct io_ring_ctx *ctx, bool force_nonspin)
 	return nr_events;
 }
 
+/**
+ * io_rw_cache_free - Frees an asynchronous read/write structure.
+ *
+ * @entry: Pointer to the asynchronous read/write structure to be freed.
+ *
+ * This function releases the memory allocated for the asynchronous read/write
+ * structure and its associated resources, such as the iovec structure.
+ */
 void io_rw_cache_free(const void *entry)
 {
 	struct io_async_rw *rw = (struct io_async_rw *) entry;
