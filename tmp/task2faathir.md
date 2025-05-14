@@ -70,7 +70,6 @@
 |          | include/linux/types.h | struct task\_struct     | 1          |
 |          | include/linux/types.h | struct io\_ring\_ctx    | 1          |
 
-
 ### `statx.c`
 
 | Source  | Library                   | Function Utilized  | Times Used |
@@ -119,8 +118,6 @@
 |        | asm-generic/bitops/non-atomic.h | READ\_ONCE            | 6          |
 |        | linux/bug.h                     | WARN\_ON\_ONCE        | 3          |
 
----
-
 ### `sync.h`
 
 | Source | Library | Function Utilized     | Times Used |
@@ -131,8 +128,6 @@
 |        | sync.c  | io\_fsync             | 1          |
 |        | sync.c  | io\_fallocate         | 1          |
 |        | sync.c  | io\_fallocate\_prep   | 1          |
-
----
 
 ### `tctx.c`
 
@@ -174,8 +169,6 @@
 |        | linux/mutex.h   | mutex\_lock                                  | 3          |
 |        | linux/mutex.h   | mutex\_unlock                                | 2          |
 
-
-
 ### `tctx.h`
 
 | Source | Library | Function Utilized                            | Times Used |
@@ -188,7 +181,6 @@
 |        | tctx.c  | io\_ringfd\_register                         | 1          |
 |        | tctx.c  | io\_ringfd\_unregister                       | 1          |
 |        | tctx.h  | io\_uring\_add\_tctx\_node (inline)          | 1          |
-
 
 ### `timeout.c`
 
@@ -228,7 +220,6 @@
 |            | /include/linux/io\_uring.h | io\_kiocb\_to\_cmd | 2         |
 |            | /include/linux/io\_uring.h | io\_req\_set\_res  | 1         |
 |            | /include/linux/io\_uring.h | IOU\_OK            | 1         |
-
 
 ### `uring_cmd.h`
 
