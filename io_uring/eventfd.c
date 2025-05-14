@@ -25,6 +25,11 @@ enum {
 	IO_EVENTFD_OP_SIGNAL_BIT,
 };
 
+/*
+ * Frees the io_ev_fd structure when it is no longer needed by calling 
+ * eventfd_ctx_put to release the eventfd context and then freeing 
+ * the io_ev_fd structure.
+ */
 static void io_eventfd_free(struct rcu_head *rcu)
 {
 	struct io_ev_fd *ev_fd = container_of(rcu, struct io_ev_fd, rcu);
@@ -33,12 +38,21 @@ static void io_eventfd_free(struct rcu_head *rcu)
 	kfree(ev_fd);
 }
 
+/*
+ * Decrements the reference count for the io_ev_fd structure and 
+ * releases it when no references remain.
+ */
 static void io_eventfd_put(struct io_ev_fd *ev_fd)
 {
 	if (refcount_dec_and_test(&ev_fd->refs))
 		call_rcu(&ev_fd->rcu, io_eventfd_free);
 }
 
+/*
+ * Signals the eventfd to wake up listeners by invoking eventfd_signal_mask 
+ * with the appropriate signal. After signaling, it releases the reference 
+ * count on the io_ev_fd structure.
+ */
 static void io_eventfd_do_signal(struct rcu_head *rcu)
 {
 	struct io_ev_fd *ev_fd = container_of(rcu, struct io_ev_fd, rcu);
@@ -47,6 +61,10 @@ static void io_eventfd_do_signal(struct rcu_head *rcu)
 	io_eventfd_put(ev_fd);
 }
 
+/*
+ * Releases the io_ev_fd structure, decrementing its reference count 
+ * and unlocking any related RCU lock if specified.
+ */
 static void io_eventfd_release(struct io_ev_fd *ev_fd, bool put_ref)
 {
 	if (put_ref)
@@ -56,6 +74,11 @@ static void io_eventfd_release(struct io_ev_fd *ev_fd, bool put_ref)
 
 /*
  * Returns true if the caller should put the ev_fd reference, false if not.
+ */
+/*
+ * Checks if eventfd signaling is allowed, and if so, triggers the 
+ * eventfd signal. If not allowed, it defers the signaling by scheduling 
+ * an RCU callback to signal later.
  */
 static bool __io_eventfd_signal(struct io_ev_fd *ev_fd)
 {
@@ -74,6 +97,10 @@ static bool __io_eventfd_signal(struct io_ev_fd *ev_fd)
  * Trigger if eventfd_async isn't set, or if it's set and the caller is
  * an async worker. If ev_fd isn't valid, obviously return false.
  */
+/*
+ * Determines whether to trigger the eventfd signal based on whether 
+ * the eventfd is asynchronous and if the current worker is valid.
+ */
 static bool io_eventfd_trigger(struct io_ev_fd *ev_fd)
 {
 	if (ev_fd)
@@ -84,6 +111,11 @@ static bool io_eventfd_trigger(struct io_ev_fd *ev_fd)
 /*
  * On success, returns with an ev_fd reference grabbed and the RCU read
  * lock held.
+ */
+/*
+ * Grabs and returns a reference to the io_ev_fd structure, ensuring
+ * the RCU read lock is held and validating that the eventfd trigger is
+ * valid before incrementing its reference count.
  */
 static struct io_ev_fd *io_eventfd_grab(struct io_ring_ctx *ctx)
 {
@@ -112,6 +144,10 @@ static struct io_ev_fd *io_eventfd_grab(struct io_ring_ctx *ctx)
 	return NULL;
 }
 
+/*
+ * Flushes the eventfd signal if necessary by checking if the completion 
+ * queue tail has advanced, and then signaling the eventfd accordingly.
+ */
 void io_eventfd_signal(struct io_ring_ctx *ctx)
 {
 	struct io_ev_fd *ev_fd;
@@ -150,6 +186,10 @@ void io_eventfd_flush_signal(struct io_ring_ctx *ctx)
 	}
 }
 
+/*
+ * Registers an eventfd for use with the io_uring context by allocating
+ * memory for the io_ev_fd structure and setting up the eventfd context.
+ */
 int io_eventfd_register(struct io_ring_ctx *ctx, void __user *arg,
 			unsigned int eventfd_async)
 {
@@ -189,6 +229,10 @@ int io_eventfd_register(struct io_ring_ctx *ctx, void __user *arg,
 	return 0;
 }
 
+/*
+ * Unregisters the eventfd for the io_uring context, freeing resources
+ * and nullifying the reference to the io_ev_fd structure.
+ */
 int io_eventfd_unregister(struct io_ring_ctx *ctx)
 {
 	struct io_ev_fd *ev_fd;

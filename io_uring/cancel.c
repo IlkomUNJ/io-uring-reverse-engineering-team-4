@@ -34,6 +34,9 @@ struct io_cancel {
 /*
  * Returns true if the request matches the criteria outlined by 'cd'.
  */
+/*
+ * Check if a given io_kiocb request matches the cancellation criteria specified in io_cancel_data.
+ */
 bool io_cancel_req_match(struct io_kiocb *req, struct io_cancel_data *cd)
 {
 	bool match_user_data = cd->flags & IORING_ASYNC_CANCEL_USERDATA;
@@ -65,6 +68,9 @@ check_seq:
 	return true;
 }
 
+/*
+ * Callback used by io_wq to determine if a work item matches the cancellation criteria.
+ */
 static bool io_cancel_cb(struct io_wq_work *work, void *data)
 {
 	struct io_kiocb *req = container_of(work, struct io_kiocb, work);
@@ -73,6 +79,9 @@ static bool io_cancel_cb(struct io_wq_work *work, void *data)
 	return io_cancel_req_match(req, cd);
 }
 
+/*
+ * Attempt to cancel a single asynchronous request in the task's io_wq workqueue.
+ */
 static int io_async_cancel_one(struct io_uring_task *tctx,
 			       struct io_cancel_data *cd)
 {
@@ -100,6 +109,10 @@ static int io_async_cancel_one(struct io_uring_task *tctx,
 	return ret;
 }
 
+/*
+ * Attempt to cancel a request via async, poll, waitid, futex, or timeout mechanisms.
+ * Tries each cancellation path in turn until one succeeds.
+ */
 int io_try_cancel(struct io_uring_task *tctx, struct io_cancel_data *cd,
 		  unsigned issue_flags)
 {
@@ -135,6 +148,10 @@ int io_try_cancel(struct io_uring_task *tctx, struct io_cancel_data *cd,
 	return ret;
 }
 
+/*
+ * Prepare an async cancel request based on the given submission queue entry.
+ * Validates the input fields and initializes the cancel structure.
+ */
 int io_async_cancel_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 {
 	struct io_cancel *cancel = io_kiocb_to_cmd(req, struct io_cancel);
@@ -162,6 +179,10 @@ int io_async_cancel_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 	return 0;
 }
 
+/*
+ * Internal function to attempt cancellation of one or more requests across potentially
+ * multiple task contexts. Used when `ALL` or `ANY` cancellation flags are specified.
+ */
 static int __io_async_cancel(struct io_cancel_data *cd,
 			     struct io_uring_task *tctx,
 			     unsigned int issue_flags)
@@ -195,6 +216,10 @@ static int __io_async_cancel(struct io_cancel_data *cd,
 	return all ? nr : ret;
 }
 
+/*
+ * Top-level entry point for handling an asynchronous cancellation request.
+ * Resolves the file if needed, calls the internal cancellation routine, and sets result.
+ */
 int io_async_cancel(struct io_kiocb *req, unsigned int issue_flags)
 {
 	struct io_cancel *cancel = io_kiocb_to_cmd(req, struct io_cancel);
@@ -232,6 +257,10 @@ done:
 	return IOU_OK;
 }
 
+/*
+ * Internal function for handling synchronous cancellation when invoked by io_sync_cancel.
+ * If fixed FD is used, it resolves it before proceeding with async cancel.
+ */
 static int __io_sync_cancel(struct io_uring_task *tctx,
 			    struct io_cancel_data *cd, int fd)
 {
@@ -253,6 +282,11 @@ static int __io_sync_cancel(struct io_uring_task *tctx,
 	return __io_async_cancel(cd, tctx, 0);
 }
 
+/*
+ * Public syscall entry point for synchronous cancellation of io_uring requests.
+ * Accepts a user-space cancellation structure, validates it, and repeatedly tries to cancel
+ * matching requests, potentially sleeping and retrying until they are found or timeout.
+ */
 int io_sync_cancel(struct io_ring_ctx *ctx, void __user *arg)
 	__must_hold(&ctx->uring_lock)
 {
@@ -342,6 +376,8 @@ out:
 	return ret;
 }
 
+// Scans a given list of I/O requests and cancels all requests that belong to the specifiedtask (tctx).
+// It can either cancel all matching tasks or only those belonging to the specific task depending on cancel_all.
 bool io_cancel_remove_all(struct io_ring_ctx *ctx, struct io_uring_task *tctx,
 			  struct hlist_head *list, bool cancel_all,
 			  bool (*cancel)(struct io_kiocb *))
@@ -363,6 +399,7 @@ bool io_cancel_remove_all(struct io_ring_ctx *ctx, struct io_uring_task *tctx,
 	return found;
 }
 
+// Cancels one or more requests in the list matching criteria in the io_cancel_data structure.
 int io_cancel_remove(struct io_ring_ctx *ctx, struct io_cancel_data *cd,
 		     unsigned int issue_flags, struct hlist_head *list,
 		     bool (*cancel)(struct io_kiocb *))

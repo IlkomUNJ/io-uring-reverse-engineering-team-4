@@ -14,6 +14,7 @@
 #include "io_uring.h"
 #include "advise.h"
 
+// Struct to hold information for fadvise operations
 struct io_fadvise {
 	struct file			*file;
 	u64				offset;
@@ -21,6 +22,7 @@ struct io_fadvise {
 	u32				advice;
 };
 
+// Struct to hold information for madvise operations
 struct io_madvise {
 	struct file			*file;
 	u64				addr;
@@ -28,6 +30,9 @@ struct io_madvise {
 	u32				advice;
 };
 
+/// Prepare a madvise request from the submission queue entry (sqe).
+/// It reads the address, length, and advice type, and marks the request to run asynchronously.
+/// Returns 0 on success or an error code.
 int io_madvise_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 {
 #if defined(CONFIG_ADVISE_SYSCALLS) && defined(CONFIG_MMU)
@@ -48,6 +53,9 @@ int io_madvise_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 #endif
 }
 
+/// Executes a madvise operation using the previously prepared data.
+/// This tells the kernel how the memory range should be treated (e.g., don't keep in cache).
+/// Returns a completion status.
 int io_madvise(struct io_kiocb *req, unsigned int issue_flags)
 {
 #if defined(CONFIG_ADVISE_SYSCALLS) && defined(CONFIG_MMU)
@@ -64,6 +72,8 @@ int io_madvise(struct io_kiocb *req, unsigned int issue_flags)
 #endif
 }
 
+/// Determine if a specific fadvise advice type should force the request to be asynchronous.
+/// Some types (e.g., DONTNEED) are more expensive and are forced to run async.
 static bool io_fadvise_force_async(struct io_fadvise *fa)
 {
 	switch (fa->advice) {
@@ -76,6 +86,9 @@ static bool io_fadvise_force_async(struct io_fadvise *fa)
 	}
 }
 
+/// Prepare an fadvise request from the submission queue entry.
+/// Reads the offset, length, and advice type; forces async for some advice types.
+/// Returns 0 on success or error code.
 int io_fadvise_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 {
 	struct io_fadvise *fa = io_kiocb_to_cmd(req, struct io_fadvise);
@@ -93,6 +106,9 @@ int io_fadvise_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 	return 0;
 }
 
+/// Executes the fadvise operation to give file usage hints to the kernel.
+/// Uses vfs_fadvise to tell the OS how it plans to use the file (e.g., sequential access).
+/// Returns a completion status.
 int io_fadvise(struct io_kiocb *req, unsigned int issue_flags)
 {
 	struct io_fadvise *fa = io_kiocb_to_cmd(req, struct io_fadvise);
