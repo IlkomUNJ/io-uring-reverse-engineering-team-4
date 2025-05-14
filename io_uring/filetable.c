@@ -13,6 +13,7 @@
 #include "rsrc.h"
 #include "filetable.h"
 
+// Function to get the next available file index from the bitmap
 static int io_file_bitmap_get(struct io_ring_ctx *ctx)
 {
 	struct io_file_table *table = &ctx->file_table;
@@ -36,6 +37,7 @@ static int io_file_bitmap_get(struct io_ring_ctx *ctx)
 	return -ENFILE;
 }
 
+// Function to allocate memory for file tables and bitmap
 bool io_alloc_file_tables(struct io_ring_ctx *ctx, struct io_file_table *table,
 			  unsigned nr_files)
 {
@@ -48,6 +50,8 @@ bool io_alloc_file_tables(struct io_ring_ctx *ctx, struct io_file_table *table,
 	return false;
 }
 
+
+// Function to free the memory for file tables and bitmap
 void io_free_file_tables(struct io_ring_ctx *ctx, struct io_file_table *table)
 {
 	io_rsrc_data_free(ctx, &table->data);
@@ -55,6 +59,7 @@ void io_free_file_tables(struct io_ring_ctx *ctx, struct io_file_table *table)
 	table->bitmap = NULL;
 }
 
+// Function to install a fixed file descriptor in a specific slot
 static int io_install_fixed_file(struct io_ring_ctx *ctx, struct file *file,
 				 u32 slot_index)
 	__must_hold(&req->ctx->uring_lock)
@@ -80,6 +85,7 @@ static int io_install_fixed_file(struct io_ring_ctx *ctx, struct file *file,
 	return 0;
 }
 
+// Function to install a fixed file descriptor, allocating a slot if needed
 int __io_fixed_fd_install(struct io_ring_ctx *ctx, struct file *file,
 			  unsigned int file_slot)
 {
@@ -104,6 +110,10 @@ int __io_fixed_fd_install(struct io_ring_ctx *ctx, struct file *file,
  * Note when io_fixed_fd_install() returns error value, it will ensure
  * fput() is called correspondingly.
  */
+/*
+ * Function to install a fixed file descriptor, ensuring that the
+ * fput() function is called in case of error.
+ */
 int io_fixed_fd_install(struct io_kiocb *req, unsigned int issue_flags,
 			struct file *file, unsigned int file_slot)
 {
@@ -119,6 +129,7 @@ int io_fixed_fd_install(struct io_kiocb *req, unsigned int issue_flags,
 	return ret;
 }
 
+// Function to remove a fixed file descriptor from a specific slot
 int io_fixed_fd_remove(struct io_ring_ctx *ctx, unsigned int offset)
 {
 	struct io_rsrc_node *node;
@@ -136,6 +147,7 @@ int io_fixed_fd_remove(struct io_ring_ctx *ctx, unsigned int offset)
 	return 0;
 }
 
+// Function to register a file allocation range
 int io_register_file_alloc_range(struct io_ring_ctx *ctx,
 				 struct io_uring_file_index_range __user *arg)
 {

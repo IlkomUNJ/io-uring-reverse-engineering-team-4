@@ -18,6 +18,12 @@ struct io_napi_entry {
 	struct rcu_head		rcu;
 };
 
+/**
+ * This function iterates over the provided hash list and searches for an
+ * io_napi_entry structure with a matching napi_id. If a match is found,
+ * the corresponding io_napi_entry is returned. If no match is found,
+ * the function returns NULL.
+ */
 static struct io_napi_entry *io_napi_hash_find(struct hlist_head *hash_list,
 					       unsigned int napi_id)
 {
@@ -32,12 +38,26 @@ static struct io_napi_entry *io_napi_hash_find(struct hlist_head *hash_list,
 	return NULL;
 }
 
+/**
+ * This function takes a network timestamp, approximated in microseconds,
+ * and converts it to a ktime_t value. The conversion is performed by
+ * shifting the input value left by 10 bits, effectively multiplying it
+ * by 1024 to approximate nanoseconds, and then converting it to ktime
+ * using the ns_to_ktime function.
+ */
 static inline ktime_t net_to_ktime(unsigned long t)
 {
 	/* napi approximating usecs, reverse busy_loop_current_time */
 	return ns_to_ktime(t << 10);
 }
 
+/**
+ * This function attempts to add a NAPI ID to the hash table and list
+ * maintained by the io_uring context. If the NAPI ID is already present,
+ * the function updates its timeout and returns an error code indicating
+ * that the ID already exists. If the ID is invalid or memory allocation
+ * fails, appropriate error codes are returned.
+ */
 int __io_napi_add_id(struct io_ring_ctx *ctx, unsigned int napi_id)
 {
 	struct hlist_head *hash_list;

@@ -39,12 +39,20 @@
 #include "truncate.h"
 #include "zcrx.h"
 
+/*
+ * This function is a placeholder for operations that should not be issued.
+ * It always triggers a warning and returns -ECANCELED.
+ */
 static int io_no_issue(struct io_kiocb *req, unsigned int issue_flags)
 {
 	WARN_ON_ONCE(1);
 	return -ECANCELED;
 }
 
+/*
+ * This function is used for operations that are not supported.
+ * It always returns -EOPNOTSUPP.
+ */
 static __maybe_unused int io_eopnotsupp_prep(struct io_kiocb *kiocb,
 					     const struct io_uring_sqe *sqe)
 {
@@ -817,32 +825,44 @@ const struct io_cold_def io_cold_defs[] = {
 	},
 };
 
-const char *io_uring_get_opcode(u8 opcode)
-{
-	if (opcode < IORING_OP_LAST)
-		return io_cold_defs[opcode].name;
-	return "INVALID";
-}
-
-bool io_uring_op_supported(u8 opcode)
-{
-	if (opcode < IORING_OP_LAST &&
-	    io_issue_defs[opcode].prep != io_eopnotsupp_prep)
-		return true;
-	return false;
-}
-
-void __init io_uring_optable_init(void)
-{
-	int i;
-
-	BUILD_BUG_ON(ARRAY_SIZE(io_cold_defs) != IORING_OP_LAST);
-	BUILD_BUG_ON(ARRAY_SIZE(io_issue_defs) != IORING_OP_LAST);
-
-	for (i = 0; i < ARRAY_SIZE(io_issue_defs); i++) {
-		BUG_ON(!io_issue_defs[i].prep);
-		if (io_issue_defs[i].prep != io_eopnotsupp_prep)
-			BUG_ON(!io_issue_defs[i].issue);
-		WARN_ON_ONCE(!io_cold_defs[i].name);
-	}
-}
+/*
+ * Retrieves the name of the io_uring operation based on the opcode.
+ * Returns "INVALID" if the opcode is out of range.
+ */
+ const char *io_uring_get_opcode(u8 opcode)
+ {
+	 if (opcode < IORING_OP_LAST)
+		 return io_cold_defs[opcode].name;
+	 return "INVALID";
+ }
+ 
+ /*
+  * Checks if a given io_uring operation is supported.
+  * Returns true if the operation is supported, false otherwise.
+  */
+ bool io_uring_op_supported(u8 opcode)
+ {
+	 if (opcode < IORING_OP_LAST &&
+		 io_issue_defs[opcode].prep != io_eopnotsupp_prep)
+		 return true;
+	 return false;
+ }
+ 
+ /*
+  * Initializes the io_uring operation table.
+  * Ensures that the operation definitions are consistent and valid.
+  */
+ void __init io_uring_optable_init(void)
+ {
+	 int i;
+ 
+	 BUILD_BUG_ON(ARRAY_SIZE(io_cold_defs) != IORING_OP_LAST);
+	 BUILD_BUG_ON(ARRAY_SIZE(io_issue_defs) != IORING_OP_LAST);
+ 
+	 for (i = 0; i < ARRAY_SIZE(io_issue_defs); i++) {
+		 BUG_ON(!io_issue_defs[i].prep);
+		 if (io_issue_defs[i].prep != io_eopnotsupp_prep)
+			 BUG_ON(!io_issue_defs[i].issue);
+		 WARN_ON_ONCE(!io_cold_defs[i].name);
+	 }
+ }

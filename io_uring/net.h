@@ -24,9 +24,24 @@ struct io_async_msghdr {
 
 #if defined(CONFIG_NET)
 
+/**
+ * Prepares a shutdown operation for the specified I/O request.
+ */
 int io_shutdown_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe);
+
+/**
+ * This function performs a shutdown operation on the I/O resource
+ * associated with the provided request. The exact behavior of the
+ * shutdown operation depends on the context of the request and the
+ * specified issue flags.
+ */
 int io_shutdown(struct io_kiocb *req, unsigned int issue_flags);
 
+/**
+ * This function is responsible for performing any necessary cleanup after
+ * a sendmsg or recvmsg operation has been completed. It ensures that all
+ * resources allocated during the operation are properly released.
+ */
 void io_sendmsg_recvmsg_cleanup(struct io_kiocb *req);
 int io_sendmsg_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe);
 int io_sendmsg(struct io_kiocb *req, unsigned int issue_flags);

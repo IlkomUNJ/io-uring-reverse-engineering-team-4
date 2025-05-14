@@ -35,6 +35,20 @@ static struct io_rsrc_node *io_sqe_buffer_register(struct io_ring_ctx *ctx,
 
 #define IO_CACHED_BVECS_SEGS	32
 
+/**
+ * __io_account_mem - Accounts memory usage for a user.
+ *
+ * @user: Pointer to the user structure.
+ * @nr_pages: Number of pages to account.
+ *
+ * This function checks if the user has sufficient memory quota to account
+ * for the specified number of pages. If the quota is exceeded, it returns
+ * an error. Otherwise, it updates the user's locked memory count.
+ *
+ * Returns:
+ * - 0 on success.
+ * - -ENOMEM if the memory limit is exceeded.
+ */
 int __io_account_mem(struct user_struct *user, unsigned long nr_pages)
 {
 	unsigned long page_limit, cur_pages, new_pages;
@@ -55,6 +69,15 @@ int __io_account_mem(struct user_struct *user, unsigned long nr_pages)
 	return 0;
 }
 
+/**
+ * io_unaccount_mem - Unaccounts memory usage for a context.
+ *
+ * @ctx: Pointer to the io_ring_ctx structure.
+ * @nr_pages: Number of pages to unaccount.
+ *
+ * This function decreases the memory usage count for the given context
+ * and its associated user.
+ */
 static void io_unaccount_mem(struct io_ring_ctx *ctx, unsigned long nr_pages)
 {
 	if (ctx->user)
@@ -64,6 +87,20 @@ static void io_unaccount_mem(struct io_ring_ctx *ctx, unsigned long nr_pages)
 		atomic64_sub(nr_pages, &ctx->mm_account->pinned_vm);
 }
 
+/**
+ * io_account_mem - Accounts memory usage for a context.
+ *
+ * @ctx: Pointer to the io_ring_ctx structure.
+ * @nr_pages: Number of pages to account.
+ *
+ * This function accounts memory usage for the given context and its
+ * associated user. It ensures that the memory usage does not exceed
+ * the allowed limits.
+ *
+ * Returns:
+ * - 0 on success.
+ * - Negative error code on failure.
+ */
 static int io_account_mem(struct io_ring_ctx *ctx, unsigned long nr_pages)
 {
 	int ret;
@@ -80,6 +117,18 @@ static int io_account_mem(struct io_ring_ctx *ctx, unsigned long nr_pages)
 	return 0;
 }
 
+/**
+ * io_buffer_validate - Validates a user-provided buffer.
+ *
+ * @iov: Pointer to the iovec structure representing the buffer.
+ *
+ * This function checks if the provided buffer is valid, ensuring that
+ * it meets the constraints for size, alignment, and address range.
+ *
+ * Returns:
+ * - 0 on success.
+ * - Negative error code on invalid input.
+ */
 int io_buffer_validate(struct iovec *iov)
 {
 	unsigned long tmp, acct_len = iov->iov_len + (PAGE_SIZE - 1);
@@ -104,6 +153,14 @@ int io_buffer_validate(struct iovec *iov)
 	return 0;
 }
 
+/**
+ * io_release_ubuf - Releases user-mapped buffer pages.
+ *
+ * @priv: Pointer to the io_mapped_ubuf structure.
+ *
+ * This function unpins the pages associated with a user-mapped buffer,
+ * releasing the resources held by the buffer.
+ */
 static void io_release_ubuf(void *priv)
 {
 	struct io_mapped_ubuf *imu = priv;
@@ -113,6 +170,20 @@ static void io_release_ubuf(void *priv)
 		unpin_user_page(imu->bvec[i].bv_page);
 }
 
+/**
+ * io_alloc_imu - Allocates an io_mapped_ubuf structure.
+ *
+ * @ctx: Pointer to the io_ring_ctx structure.
+ * @nr_bvecs: Number of bio_vec entries to allocate.
+ *
+ * This function allocates an io_mapped_ubuf structure with the specified
+ * number of bio_vec entries. It uses a cache for small allocations and
+ * falls back to dynamic allocation for larger sizes.
+ *
+ * Returns:
+ * - Pointer to the allocated io_mapped_ubuf structure on success.
+ * - NULL on failure.
+ */
 static struct io_mapped_ubuf *io_alloc_imu(struct io_ring_ctx *ctx,
 					   int nr_bvecs)
 {
@@ -122,6 +193,15 @@ static struct io_mapped_ubuf *io_alloc_imu(struct io_ring_ctx *ctx,
 			GFP_KERNEL);
 }
 
+/**
+ * io_free_imu - Frees an io_mapped_ubuf structure.
+ *
+ * @ctx: Pointer to the io_ring_ctx structure.
+ * @imu: Pointer to the io_mapped_ubuf structure to free.
+ *
+ * This function releases the resources associated with an io_mapped_ubuf
+ * structure, including its bio_vec entries.
+ */
 static void io_free_imu(struct io_ring_ctx *ctx, struct io_mapped_ubuf *imu)
 {
 	if (imu->nr_bvecs <= IO_CACHED_BVECS_SEGS)
@@ -130,6 +210,16 @@ static void io_free_imu(struct io_ring_ctx *ctx, struct io_mapped_ubuf *imu)
 		kvfree(imu);
 }
 
+/**
+ * io_buffer_unmap - Unmaps and releases a user-mapped buffer.
+ *
+ * @ctx: Pointer to the io_ring_ctx structure.
+ * @imu: Pointer to the io_mapped_ubuf structure to unmap.
+ *
+ * This function unmaps a user-mapped buffer, releasing its resources
+ * and decrementing its reference count. If the reference count reaches
+ * zero, the buffer is freed.
+ */
 static void io_buffer_unmap(struct io_ring_ctx *ctx, struct io_mapped_ubuf *imu)
 {
 	if (!refcount_dec_and_test(&imu->refs))
@@ -141,6 +231,20 @@ static void io_buffer_unmap(struct io_ring_ctx *ctx, struct io_mapped_ubuf *imu)
 	io_free_imu(ctx, imu);
 }
 
+/**
+ * io_rsrc_node_alloc - Allocates a resource node.
+ *
+ * @ctx: Pointer to the io_ring_ctx structure.
+ * @type: Type of the resource node.
+ *
+ * This function allocates a resource node from the context's cache.
+ * The node is initialized with the specified type and a reference count
+ * of 1.
+ *
+ * Returns:
+ * - Pointer to the allocated resource node on success.
+ * - NULL on failure.
+ */
 struct io_rsrc_node *io_rsrc_node_alloc(struct io_ring_ctx *ctx, int type)
 {
 	struct io_rsrc_node *node;
@@ -155,6 +259,18 @@ struct io_rsrc_node *io_rsrc_node_alloc(struct io_ring_ctx *ctx, int type)
 	return node;
 }
 
+/**
+ * io_rsrc_cache_init - Initializes resource caches for a context.
+ *
+ * @ctx: Pointer to the io_ring_ctx structure.
+ *
+ * This function initializes the caches for resource nodes and
+ * io_mapped_ubuf structures in the given context.
+ *
+ * Returns:
+ * - true on success.
+ * - false on failure.
+ */
 bool io_rsrc_cache_init(struct io_ring_ctx *ctx)
 {
 	const int imu_cache_size = struct_size_t(struct io_mapped_ubuf, bvec,
@@ -169,12 +285,29 @@ bool io_rsrc_cache_init(struct io_ring_ctx *ctx)
 	return ret;
 }
 
+/**
+ * io_rsrc_cache_free - Frees resource caches for a context.
+ *
+ * @ctx: Pointer to the io_ring_ctx structure.
+ *
+ * This function releases the caches for resource nodes and
+ * io_mapped_ubuf structures in the given context.
+ */
 void io_rsrc_cache_free(struct io_ring_ctx *ctx)
 {
 	io_alloc_cache_free(&ctx->node_cache, kfree);
 	io_alloc_cache_free(&ctx->imu_cache, kfree);
 }
 
+/**
+ * io_rsrc_data_free - Frees resource data for a context.
+ *
+ * @ctx: Pointer to the io_ring_ctx structure.
+ * @data: Pointer to the io_rsrc_data structure to free.
+ *
+ * This function releases all resource nodes in the given resource data
+ * structure and frees the memory allocated for the nodes array.
+ */
 __cold void io_rsrc_data_free(struct io_ring_ctx *ctx,
 			      struct io_rsrc_data *data)
 {
@@ -189,6 +322,19 @@ __cold void io_rsrc_data_free(struct io_ring_ctx *ctx,
 	data->nr = 0;
 }
 
+/**
+ * io_rsrc_data_alloc - Allocates resource data.
+ *
+ * @data: Pointer to the io_rsrc_data structure to initialize.
+ * @nr: Number of resource nodes to allocate.
+ *
+ * This function allocates memory for the resource nodes array in the
+ * given resource data structure.
+ *
+ * Returns:
+ * - 0 on success.
+ * - -ENOMEM on memory allocation failure.
+ */
 __cold int io_rsrc_data_alloc(struct io_rsrc_data *data, unsigned nr)
 {
 	data->nodes = kvmalloc_array(nr, sizeof(struct io_rsrc_node *),
@@ -200,6 +346,21 @@ __cold int io_rsrc_data_alloc(struct io_rsrc_data *data, unsigned nr)
 	return -ENOMEM;
 }
 
+/**
+ * __io_sqe_files_update - Updates registered files in the io_uring context.
+ *
+ * @ctx: Pointer to the io_ring_ctx structure representing the io_uring context.
+ * @up: Pointer to the io_uring_rsrc_update2 structure containing update details.
+ * @nr_args: Number of file descriptors to update.
+ *
+ * This function updates the registered files in the io_uring context based on
+ * the provided update details. It validates the input parameters, retrieves
+ * the new file descriptors, and replaces the existing ones in the file table.
+ *
+ * Returns:
+ * - The number of successfully updated file descriptors on success.
+ * - Negative error code on failure.
+ */
 static int __io_sqe_files_update(struct io_ring_ctx *ctx,
 				 struct io_uring_rsrc_update2 *up,
 				 unsigned nr_args)
@@ -265,6 +426,21 @@ static int __io_sqe_files_update(struct io_ring_ctx *ctx,
 	return done ? done : err;
 }
 
+/**
+ * __io_sqe_buffers_update - Updates registered buffers in the io_uring context.
+ *
+ * @ctx: Pointer to the io_ring_ctx structure representing the io_uring context.
+ * @up: Pointer to the io_uring_rsrc_update2 structure containing update details.
+ * @nr_args: Number of buffers to update.
+ *
+ * This function updates the registered buffers in the io_uring context based on
+ * the provided update details. It validates the input parameters, retrieves
+ * the new buffers, and replaces the existing ones in the buffer table.
+ *
+ * Returns:
+ * - The number of successfully updated buffers on success.
+ * - Negative error code on failure.
+ */
 static int __io_sqe_buffers_update(struct io_ring_ctx *ctx,
 				   struct io_uring_rsrc_update2 *up,
 				   unsigned int nr_args)
@@ -322,6 +498,22 @@ static int __io_sqe_buffers_update(struct io_ring_ctx *ctx,
 	return done ? done : err;
 }
 
+/**
+ * __io_register_rsrc_update - Handles resource updates for io_uring.
+ *
+ * @ctx: Pointer to the io_ring_ctx structure representing the io_uring context.
+ * @type: The type of resource to update (e.g., files or buffers).
+ * @up: Pointer to the io_uring_rsrc_update2 structure containing update details.
+ * @nr_args: Number of resources to update.
+ *
+ * This function processes resource updates for io_uring, such as updating
+ * registered files or buffers. It validates the input parameters and invokes
+ * the appropriate update handler based on the resource type.
+ *
+ * Returns:
+ * - The number of successfully updated resources on success.
+ * - Negative error code on failure.
+ */
 static int __io_register_rsrc_update(struct io_ring_ctx *ctx, unsigned type,
 				     struct io_uring_rsrc_update2 *up,
 				     unsigned nr_args)
@@ -342,6 +534,21 @@ static int __io_register_rsrc_update(struct io_ring_ctx *ctx, unsigned type,
 	return -EINVAL;
 }
 
+/**
+ * io_register_files_update - Updates registered files in the io_uring context.
+ *
+ * @ctx: Pointer to the io_ring_ctx structure representing the io_uring context.
+ * @arg: Pointer to the user-provided update data.
+ * @nr_args: Number of file descriptors to update.
+ *
+ * This function updates the registered files in the io_uring context based on
+ * the user-provided update data. It validates the input and invokes the
+ * resource update handler for files.
+ *
+ * Returns:
+ * - The number of successfully updated file descriptors on success.
+ * - Negative error code on failure.
+ */
 int io_register_files_update(struct io_ring_ctx *ctx, void __user *arg,
 			     unsigned nr_args)
 {
@@ -357,6 +564,22 @@ int io_register_files_update(struct io_ring_ctx *ctx, void __user *arg,
 	return __io_register_rsrc_update(ctx, IORING_RSRC_FILE, &up, nr_args);
 }
 
+/**
+ * io_register_rsrc_update - Updates registered resources in the io_uring context.
+ *
+ * @ctx: Pointer to the io_ring_ctx structure representing the io_uring context.
+ * @arg: Pointer to the user-provided update data.
+ * @size: Size of the update data structure.
+ * @type: The type of resource to update (e.g., files or buffers).
+ *
+ * This function updates the registered resources in the io_uring context based
+ * on the user-provided update data. It validates the input and invokes the
+ * appropriate resource update handler.
+ *
+ * Returns:
+ * - The number of successfully updated resources on success.
+ * - Negative error code on failure.
+ */
 int io_register_rsrc_update(struct io_ring_ctx *ctx, void __user *arg,
 			    unsigned size, unsigned type)
 {
@@ -371,6 +594,22 @@ int io_register_rsrc_update(struct io_ring_ctx *ctx, void __user *arg,
 	return __io_register_rsrc_update(ctx, type, &up, up.nr);
 }
 
+/**
+ * io_register_rsrc - Registers resources (files or buffers) for io_uring.
+ *
+ * @ctx: Pointer to the io_ring_ctx structure representing the io_uring context.
+ * @arg: Pointer to the user-provided resource registration data.
+ * @size: Size of the resource registration data structure.
+ * @type: The type of resource to register (e.g., files or buffers).
+ *
+ * This function handles the registration of resources, such as files or buffers,
+ * for use with io_uring. It validates the input parameters, allocates the necessary
+ * resources, and updates the io_uring context with the registered resources.
+ *
+ * Returns:
+ * - 0 on success.
+ * - Negative error code on failure.
+ */
 __cold int io_register_rsrc(struct io_ring_ctx *ctx, void __user *arg,
 			    unsigned int size, unsigned int type)
 {
@@ -403,6 +642,19 @@ __cold int io_register_rsrc(struct io_ring_ctx *ctx, void __user *arg,
 	return -EINVAL;
 }
 
+/**
+ * io_files_update_prep - Prepares a file update request for io_uring.
+ *
+ * @req: Pointer to the io_kiocb structure representing the request.
+ * @sqe: Pointer to the io_uring submission queue entry.
+ *
+ * This function initializes the necessary parameters for updating files
+ * in the io_uring context based on the submission queue entry (SQE).
+ *
+ * Returns:
+ * - 0 on success.
+ * - Negative error code on invalid input.
+ */
 int io_files_update_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 {
 	struct io_rsrc_update *up = io_kiocb_to_cmd(req, struct io_rsrc_update);
@@ -420,6 +672,20 @@ int io_files_update_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 	return 0;
 }
 
+/**
+ * io_files_update_with_index_alloc - Updates file descriptors with index allocation.
+ *
+ * @req: Pointer to the io_kiocb structure representing the I/O request.
+ * @issue_flags: Flags indicating specific behaviors or conditions for the operation.
+ *
+ * This function is responsible for updating file descriptors in the io_uring
+ * context, allocating indices as necessary. It ensures that the file descriptor
+ * table is properly managed and updated to reflect the current state of the
+ * operation.
+ *
+ * Returns:
+ *   0 on success, or a negative error code on failure.
+ */
 static int io_files_update_with_index_alloc(struct io_kiocb *req,
 					    unsigned int issue_flags)
 {
@@ -459,6 +725,20 @@ static int io_files_update_with_index_alloc(struct io_kiocb *req,
 	return ret;
 }
 
+/**
+ * io_files_update - Updates registered files in the io_uring context.
+ *
+ * @req: Pointer to the io_kiocb structure representing the request.
+ * @issue_flags: Flags indicating the context in which the operation is issued.
+ *
+ * This function updates the registered files in the io_uring context based
+ * on the parameters provided in the request. It handles both direct updates
+ * and updates with index allocation.
+ *
+ * Returns:
+ * - IOU_OK on success.
+ * - Negative error code on failure.
+ */
 int io_files_update(struct io_kiocb *req, unsigned int issue_flags)
 {
 	struct io_rsrc_update *up = io_kiocb_to_cmd(req, struct io_rsrc_update);
@@ -488,6 +768,16 @@ int io_files_update(struct io_kiocb *req, unsigned int issue_flags)
 	return IOU_OK;
 }
 
+/**
+ * io_free_rsrc_node - Frees a resource node in the io_uring context.
+ * @ctx: Pointer to the io_uring context structure.
+ * @node: Pointer to the resource node to be freed.
+ *
+ * This function is responsible for releasing the memory and resources
+ * associated with a specific resource node in the io_uring context. It
+ * ensures proper cleanup of the node to prevent memory leaks or dangling
+ * pointers.
+ */
 void io_free_rsrc_node(struct io_ring_ctx *ctx, struct io_rsrc_node *node)
 {
 	if (node->tag)
@@ -508,6 +798,19 @@ void io_free_rsrc_node(struct io_ring_ctx *ctx, struct io_rsrc_node *node)
 	io_cache_free(&ctx->node_cache, node);
 }
 
+/**
+ * io_sqe_files_unregister - Unregisters all files from the io_uring context.
+ *
+ * @ctx: Pointer to the io_ring_ctx structure representing the io_uring context.
+ *
+ * This function releases all file descriptors registered in the io_uring
+ * context. It ensures that the file table is properly cleared and resources
+ * are freed.
+ *
+ * Returns:
+ * - 0 on success.
+ * - -ENXIO if no files are registered.
+ */
 int io_sqe_files_unregister(struct io_ring_ctx *ctx)
 {
 	if (!ctx->file_table.data.nr)
@@ -518,6 +821,22 @@ int io_sqe_files_unregister(struct io_ring_ctx *ctx)
 	return 0;
 }
 
+/**
+ * io_sqe_files_register - Registers files for io_uring.
+ *
+ * @ctx: Pointer to the io_ring_ctx structure representing the io_uring context.
+ * @arg: Pointer to the user-provided file descriptor array.
+ * @nr_args: Number of file descriptors to register.
+ * @tags: Pointer to the user-provided tags array.
+ *
+ * This function registers an array of file descriptors for use with io_uring.
+ * It validates the input, allocates resources, and updates the file table
+ * in the io_uring context.
+ *
+ * Returns:
+ * - 0 on success.
+ * - Negative error code on failure.
+ */
 int io_sqe_files_register(struct io_ring_ctx *ctx, void __user *arg,
 			  unsigned nr_args, u64 __user *tags)
 {
@@ -587,6 +906,18 @@ fail:
 	return ret;
 }
 
+/**
+ * io_sqe_buffers_unregister - Unregisters all buffers from the io_uring context.
+ *
+ * @ctx: Pointer to the io_ring_ctx structure representing the io_uring context.
+ *
+ * This function releases all buffers registered in the io_uring context.
+ * It ensures that the buffer table is properly cleared and resources are freed.
+ *
+ * Returns:
+ * - 0 on success.
+ * - -ENXIO if no buffers are registered.
+ */
 int io_sqe_buffers_unregister(struct io_ring_ctx *ctx)
 {
 	if (!ctx->buf_table.nr)
@@ -837,6 +1168,22 @@ done:
 	return node;
 }
 
+/**
+ * io_sqe_buffers_register - Registers buffers for io_uring.
+ *
+ * @ctx: Pointer to the io_ring_ctx structure representing the io_uring context.
+ * @arg: Pointer to the user-provided buffer array.
+ * @nr_args: Number of buffers to register.
+ * @tags: Pointer to the user-provided tags array.
+ *
+ * This function registers an array of buffers for use with io_uring.
+ * It validates the input, allocates resources, and updates the buffer table
+ * in the io_uring context.
+ *
+ * Returns:
+ * - 0 on success.
+ * - Negative error code on failure.
+ */
 int io_sqe_buffers_register(struct io_ring_ctx *ctx, void __user *arg,
 			    unsigned int nr_args, u64 __user *tags)
 {
@@ -907,6 +1254,23 @@ int io_sqe_buffers_register(struct io_ring_ctx *ctx, void __user *arg,
 	return ret;
 }
 
+/**
+ * io_buffer_register_bvec - Registers a buffer using a bio_vec for io_uring.
+ *
+ * @cmd: Pointer to the io_uring_cmd structure representing the command.
+ * @rq: Pointer to the request structure.
+ * @release: Function pointer for releasing the buffer.
+ * @index: Index in the buffer table where the buffer will be registered.
+ * @issue_flags: Flags indicating the context in which the operation is issued.
+ *
+ * This function registers a buffer for io_uring using a bio_vec structure.
+ * It validates the input, allocates resources, and updates the buffer table
+ * in the io_uring context.
+ *
+ * Returns:
+ * - 0 on success.
+ * - Negative error code on failure.
+ */
 int io_buffer_register_bvec(struct io_uring_cmd *cmd, struct request *rq,
 			    void (*release)(void *), unsigned int index,
 			    unsigned int issue_flags)
@@ -969,6 +1333,20 @@ unlock:
 }
 EXPORT_SYMBOL_GPL(io_buffer_register_bvec);
 
+/**
+ * io_buffer_unregister_bvec - Unregisters a buffer using a bio_vec for io_uring.
+ *
+ * @cmd: Pointer to the io_uring_cmd structure representing the command.
+ * @index: Index in the buffer table where the buffer is registered.
+ * @issue_flags: Flags indicating the context in which the operation is issued.
+ *
+ * This function unregisters a buffer for io_uring using a bio_vec structure.
+ * It validates the input and releases the resources associated with the buffer.
+ *
+ * Returns:
+ * - 0 on success.
+ * - Negative error code on failure.
+ */
 int io_buffer_unregister_bvec(struct io_uring_cmd *cmd, unsigned int index,
 			      unsigned int issue_flags)
 {
@@ -1002,6 +1380,21 @@ unlock:
 }
 EXPORT_SYMBOL_GPL(io_buffer_unregister_bvec);
 
+/**
+ * validate_fixed_range - Validates a fixed buffer range.
+ *
+ * @buf_addr: Starting address of the buffer.
+ * @len: Length of the buffer.
+ * @imu: Pointer to the io_mapped_ubuf structure representing the buffer.
+ *
+ * This function checks if the specified buffer range is valid and within
+ * the bounds of the registered buffer. It ensures that the buffer does not
+ * exceed the allowed size or address range.
+ *
+ * Returns:
+ * - 0 on success.
+ * - Negative error code on invalid input.
+ */
 static int validate_fixed_range(u64 buf_addr, size_t len,
 				const struct io_mapped_ubuf *imu)
 {
@@ -1017,6 +1410,23 @@ static int validate_fixed_range(u64 buf_addr, size_t len,
 	return 0;
 }
 
+/**
+ * io_import_fixed - Imports a fixed buffer for I/O operations.
+ *
+ * @ddir: Direction of the data transfer (read or write).
+ * @iter: Pointer to the iov_iter structure for the I/O operation.
+ * @imu: Pointer to the io_mapped_ubuf structure representing the buffer.
+ * @buf_addr: Starting address of the buffer.
+ * @len: Length of the buffer.
+ *
+ * This function imports a fixed buffer for use in I/O operations. It validates
+ * the buffer range, sets up the I/O iterator, and adjusts the iterator to
+ * account for the buffer offset.
+ *
+ * Returns:
+ * - 0 on success.
+ * - Negative error code on failure.
+ */
 static int io_import_fixed(int ddir, struct iov_iter *iter,
 			   struct io_mapped_ubuf *imu,
 			   u64 buf_addr, size_t len)
@@ -1102,6 +1512,24 @@ inline struct io_rsrc_node *io_find_buf_node(struct io_kiocb *req,
 	return node;
 }
 
+/**
+ * io_import_reg_buf - Imports a registered buffer for I/O operations.
+ *
+ * @req: Pointer to the io_kiocb structure representing the I/O request.
+ * @iter: Pointer to the iov_iter structure for the I/O operation.
+ * @buf_addr: Starting address of the buffer.
+ * @len: Length of the buffer.
+ * @ddir: Direction of the data transfer (read or write).
+ * @issue_flags: Flags indicating the context in which the operation is issued.
+ *
+ * This function imports a registered buffer for use in I/O operations. It
+ * retrieves the buffer node associated with the request, validates the buffer
+ * range, and sets up the I/O iterator for the operation.
+ *
+ * Returns:
+ * - 0 on success.
+ * - Negative error code on failure.
+ */
 int io_import_reg_buf(struct io_kiocb *req, struct iov_iter *iter,
 			u64 buf_addr, size_t len, int ddir,
 			unsigned issue_flags)
@@ -1115,6 +1543,17 @@ int io_import_reg_buf(struct io_kiocb *req, struct iov_iter *iter,
 }
 
 /* Lock two rings at once. The rings must be different! */
+
+/**
+ * lock_two_rings - Locks two io_uring contexts in a specific order.
+ *
+ * @ctx1: Pointer to the first io_ring_ctx structure.
+ * @ctx2: Pointer to the second io_ring_ctx structure.
+ *
+ * This function locks two io_uring contexts in a specific order to avoid
+ * deadlocks. The locks are acquired in ascending order of the context
+ * pointers.
+ */
 static void lock_two_rings(struct io_ring_ctx *ctx1, struct io_ring_ctx *ctx2)
 {
 	if (ctx1 > ctx2)
@@ -1124,6 +1563,22 @@ static void lock_two_rings(struct io_ring_ctx *ctx1, struct io_ring_ctx *ctx2)
 }
 
 /* Both rings are locked by the caller. */
+
+/**
+ * io_clone_buffers - Clones registered buffers from one io_uring context to another.
+ *
+ * @ctx: Pointer to the destination io_ring_ctx structure.
+ * @src_ctx: Pointer to the source io_ring_ctx structure.
+ * @arg: Pointer to the io_uring_clone_buffers structure containing clone details.
+ *
+ * This function clones registered buffers from the source io_uring context to
+ * the destination io_uring context. It validates the input parameters, allocates
+ * resources, and updates the destination context with the cloned buffers.
+ *
+ * Returns:
+ * - 0 on success.
+ * - Negative error code on failure.
+ */
 static int io_clone_buffers(struct io_ring_ctx *ctx, struct io_ring_ctx *src_ctx,
 			    struct io_uring_clone_buffers *arg)
 {
@@ -1239,6 +1694,22 @@ out_free:
  *
  * Since the memory is already accounted once, don't account it again.
  */
+
+ /**
+ * io_register_clone_buffers - Clones registered buffers from another io_uring instance.
+ *
+ * @ctx: Pointer to the destination io_ring_ctx structure.
+ * @arg: Pointer to the user-provided io_uring_clone_buffers structure.
+ *
+ * This function clones registered buffers from the source io_uring instance
+ * specified by the file descriptor in the user-provided structure. It ensures
+ * that the memory mappings are reused for efficiency and avoids double accounting
+ * of memory usage.
+ *
+ * Returns:
+ * - 0 on success.
+ * - Negative error code on failure.
+ */
 int io_register_clone_buffers(struct io_ring_ctx *ctx, void __user *arg)
 {
 	struct io_uring_clone_buffers buf;
@@ -1276,6 +1747,14 @@ int io_register_clone_buffers(struct io_ring_ctx *ctx, void __user *arg)
 	return ret;
 }
 
+/**
+ * io_vec_free - Frees an iovec structure.
+ *
+ * @iv: Pointer to the iou_vec structure to be freed.
+ *
+ * This function releases the memory allocated for the iovec structure
+ * and resets its fields to indicate that it is no longer in use.
+ */
 void io_vec_free(struct iou_vec *iv)
 {
 	if (!iv->iovec)
@@ -1285,6 +1764,20 @@ void io_vec_free(struct iou_vec *iv)
 	iv->nr = 0;
 }
 
+/**
+ * io_vec_realloc - Reallocates an iovec structure.
+ *
+ * @iv: Pointer to the iou_vec structure to be reallocated.
+ * @nr_entries: The new number of entries for the iovec structure.
+ *
+ * This function reallocates the memory for the iovec structure to accommodate
+ * the specified number of entries. If the reallocation is successful, the
+ * existing iovec structure is updated with the new memory.
+ *
+ * Returns:
+ * - 0 on success.
+ * - Negative error code on failure.
+ */
 int io_vec_realloc(struct iou_vec *iv, unsigned nr_entries)
 {
 	gfp_t gfp = GFP_KERNEL | __GFP_NOWARN;
@@ -1300,6 +1793,24 @@ int io_vec_realloc(struct iou_vec *iv, unsigned nr_entries)
 	return 0;
 }
 
+/**
+ * io_vec_fill_bvec - Fills a bio_vec structure from an iovec for I/O operations.
+ *
+ * @ddir: Direction of the data transfer (read or write).
+ * @iter: Pointer to the iov_iter structure for the I/O operation.
+ * @imu: Pointer to the io_mapped_ubuf structure representing the buffer.
+ * @iovec: Pointer to the iovec array containing the buffer details.
+ * @nr_iovs: Number of iovec entries to process.
+ * @vec: Pointer to the iou_vec structure to be filled with bio_vec entries.
+ *
+ * This function converts an iovec structure into a bio_vec structure for use
+ * in I/O operations. It validates the buffer range, calculates the offsets,
+ * and fills the bio_vec entries with the appropriate page and offset details.
+ *
+ * Returns:
+ * - 0 on success.
+ * - Negative error code on failure.
+ */
 static int io_vec_fill_bvec(int ddir, struct iov_iter *iter,
 				struct io_mapped_ubuf *imu,
 				struct iovec *iovec, unsigned nr_iovs,
@@ -1350,6 +1861,20 @@ static int io_vec_fill_bvec(int ddir, struct iov_iter *iter,
 	return 0;
 }
 
+/**
+ * io_estimate_bvec_size - Estimates the number of bio_vec entries needed for an iovec.
+ *
+ * @iov: Pointer to the iovec array containing the buffer details.
+ * @nr_iovs: Number of iovec entries to process.
+ * @imu: Pointer to the io_mapped_ubuf structure representing the buffer.
+ *
+ * This function calculates the maximum number of bio_vec entries required to
+ * represent the given iovec structure. It considers the folio size and alignment
+ * of the buffer to determine the number of segments needed.
+ *
+ * Returns:
+ * - The estimated number of bio_vec entries.
+ */
 static int io_estimate_bvec_size(struct iovec *iov, unsigned nr_iovs,
 				 struct io_mapped_ubuf *imu)
 {
@@ -1362,6 +1887,24 @@ static int io_estimate_bvec_size(struct iovec *iov, unsigned nr_iovs,
 	return max_segs;
 }
 
+/**
+ * io_vec_fill_kern_bvec - Fills a bio_vec structure for kernel buffers.
+ *
+ * @ddir: Direction of the data transfer (read or write).
+ * @iter: Pointer to the iov_iter structure for the I/O operation.
+ * @imu: Pointer to the io_mapped_ubuf structure representing the buffer.
+ * @iovec: Pointer to the iovec array containing the buffer details.
+ * @nr_iovs: Number of iovec entries to process.
+ * @vec: Pointer to the iou_vec structure to be filled with bio_vec entries.
+ *
+ * This function converts an iovec structure into a bio_vec structure for kernel
+ * buffers. It validates the buffer range, calculates the offsets, and fills the
+ * bio_vec entries with the appropriate page and offset details.
+ *
+ * Returns:
+ * - 0 on success.
+ * - Negative error code on failure.
+ */
 static int io_vec_fill_kern_bvec(int ddir, struct iov_iter *iter,
 				 struct io_mapped_ubuf *imu,
 				 struct iovec *iovec, unsigned nr_iovs,
@@ -1390,6 +1933,18 @@ static int io_vec_fill_kern_bvec(int ddir, struct iov_iter *iter,
 	return 0;
 }
 
+/**
+ * iov_kern_bvec_size - Calculate the size of kernel bvec for an iovec structure
+ * @iov: Pointer to the iovec structure containing user-space memory buffers
+ * @imu: Pointer to the io_mapped_ubuf structure for mapped user buffers
+ * @nr_seg: Pointer to an unsigned int to store the number of segments
+ *
+ * This function computes the size of the kernel bvec required to represent
+ * the memory described by the given iovec structure. It also calculates
+ * the number of segments and stores it in the location pointed to by @nr_seg.
+ *
+ * Return: 0 on success, or a negative error code on failure.
+ */
 static int iov_kern_bvec_size(const struct iovec *iov,
 			      const struct io_mapped_ubuf *imu,
 			      unsigned int *nr_seg)
@@ -1413,6 +1968,20 @@ static int iov_kern_bvec_size(const struct iovec *iov,
 	return 0;
 }
 
+/**
+ * io_kern_bvec_size - Calculates the size of kernel bio-vector segments.
+ * @iov: Pointer to an array of iovec structures representing user buffers.
+ * @nr_iovs: The number of iovec structures in the array.
+ * @imu: Pointer to an io_mapped_ubuf structure for storing mapped user buffers.
+ * @nr_segs: Pointer to an unsigned integer to store the number of segments.
+ *
+ * This function computes the size of kernel bio-vector segments based on the
+ * provided iovec array and updates the number of segments in the provided
+ * pointer. It is used for managing memory mappings and segmenting user buffers
+ * for kernel operations.
+ *
+ * Return: 0 on success, or a negative error code on failure.
+ */
 static int io_kern_bvec_size(struct iovec *iov, unsigned nr_iovs,
 			     struct io_mapped_ubuf *imu, unsigned *nr_segs)
 {
@@ -1438,6 +2007,24 @@ static int io_kern_bvec_size(struct iovec *iov, unsigned nr_iovs,
 	return 0;
 }
 
+/**
+ * io_import_reg_vec - Imports a registered vector for I/O operations.
+ *
+ * @ddir: Direction of the data transfer (read or write).
+ * @iter: Pointer to the iov_iter structure for the I/O operation.
+ * @req: Pointer to the io_kiocb structure representing the request.
+ * @vec: Pointer to the iou_vec structure to be filled.
+ * @nr_iovs: Number of iovec entries to process.
+ * @issue_flags: Flags indicating the context in which the operation is issued.
+ *
+ * This function imports a registered vector for use in I/O operations. It
+ * retrieves the buffer node associated with the request, validates the buffer
+ * range, and sets up the I/O iterator for the operation.
+ *
+ * Returns:
+ * - 0 on success.
+ * - Negative error code on failure.
+ */
 int io_import_reg_vec(int ddir, struct iov_iter *iter,
 			struct io_kiocb *req, struct iou_vec *vec,
 			unsigned nr_iovs, unsigned issue_flags)
@@ -1498,6 +2085,22 @@ int io_import_reg_vec(int ddir, struct iov_iter *iter,
 	return io_vec_fill_bvec(ddir, iter, imu, iov, nr_iovs, vec);
 }
 
+/**
+ * io_prep_reg_iovec - Prepares an iovec structure for registration.
+ *
+ * @req: Pointer to the io_kiocb structure representing the request.
+ * @iv: Pointer to the iou_vec structure to be prepared.
+ * @uvec: Pointer to the user-provided iovec array.
+ * @uvec_segs: Number of segments in the user-provided iovec array.
+ *
+ * This function prepares an iovec structure for registration by copying the
+ * user-provided iovec array into the kernel space. It ensures that the iovec
+ * structure is properly aligned and ready for use in I/O operations.
+ *
+ * Returns:
+ * - 0 on success.
+ * - Negative error code on failure.
+ */
 int io_prep_reg_iovec(struct io_kiocb *req, struct iou_vec *iv,
 		      const struct iovec __user *uvec, size_t uvec_segs)
 {

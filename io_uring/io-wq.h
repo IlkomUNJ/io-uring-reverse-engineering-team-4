@@ -43,13 +43,50 @@ struct io_wq_data {
 	free_work_fn *free_work;
 };
 
+/**
+ * This function initializes and returns a new I/O workqueue instance. The
+ * bounded parameter determines whether the workqueue has a limit on the number
+ * of concurrent tasks it can handle. The data parameter provides additional
+ * context or configuration required for the workqueue's operation.
+ */
 struct io_wq *io_wq_create(unsigned bounded, struct io_wq_data *data);
+
+
+/**
+ * This function begins the process of shutting down the specified io_wq
+ * (I/O work queue). It ensures that any ongoing operations are properly
+ * handled and prepares the work queue for cleanup and resource deallocation.
+ */
 void io_wq_exit_start(struct io_wq *wq);
+
+/**
+ * This function is used to clean up and release the resources associated with
+ * the specified io_wq (I/O workqueue) structure. It ensures that all pending
+ * tasks or operations are properly handled before exiting. This is typically
+ * called when the io_wq is no longer needed or during the shutdown process.
+ */
 void io_wq_put_and_exit(struct io_wq *wq);
 
+/**
+ * This function adds a work item to the specified io_wq work queue for
+ * asynchronous processing. The work item will be processed by one of the
+ * workers associated with the work queue.
+ */
 void io_wq_enqueue(struct io_wq *wq, struct io_wq_work *work);
+
+/**
+ * This function is responsible for hashing a work item into the appropriate
+ * location within the io_uring workqueue system. The hashing mechanism may
+ * use the provided value to determine the placement or categorization of the
+ * work item.
+ */
 void io_wq_hash_work(struct io_wq_work *work, void *val);
 
+/**
+ * This function configures the CPU affinity for the given io_uring task
+ * by applying the specified CPU mask. The CPU mask determines the set of
+ * CPUs on which the task is allowed to run.
+ */
 int io_wq_cpu_affinity(struct io_uring_task *tctx, cpumask_var_t mask);
 int io_wq_max_workers(struct io_wq *wq, int *new_count);
 bool io_wq_worker_stopped(void);

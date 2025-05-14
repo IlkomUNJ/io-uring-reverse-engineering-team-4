@@ -53,9 +53,38 @@ struct io_poll_table {
 
 #define IO_WQE_F_DOUBLE		1
 
+/**
+ * io_poll_wake - Callback function to handle wake-up events for polling.
+ * 
+ * @wait: Pointer to the wait queue entry that triggered the wake-up.
+ * @mode: The mode in which the wake-up occurred (e.g., read, write, etc.).
+ * @sync: Indicates whether the wake-up is synchronous (non-zero) or asynchronous (zero).
+ * @key: A pointer to the key associated with the wake-up event, typically used
+ *       to identify the specific event or condition that caused the wake-up.
+ * 
+ * This function is invoked when a wake-up event occurs on a wait queue entry
+ * associated with polling operations. It processes the wake-up event and
+ * performs any necessary actions to handle the event.
+ * 
+ * Return: An integer value indicating the result of the wake-up handling.
+ *         Typically, this is used to determine whether further wake-ups
+ *         should be processed or not.
+ */
 static int io_poll_wake(struct wait_queue_entry *wait, unsigned mode, int sync,
 			void *key);
 
+/**
+ * wqe_to_req - Converts a wait queue entry to an io_kiocb request.
+ * @wqe: Pointer to the wait queue entry to be converted.
+ *
+ * This function extracts the private data from the given wait queue entry,
+ * masks out the IO_WQE_F_DOUBLE flag, and returns it as a pointer to an
+ * io_kiocb structure. The IO_WQE_F_DOUBLE flag is cleared to ensure the
+ * returned pointer is properly aligned and valid for use as an io_kiocb.
+ *
+ * Return: A pointer to the io_kiocb structure corresponding to the wait
+ * queue entry.
+ */
 static inline struct io_kiocb *wqe_to_req(struct wait_queue_entry *wqe)
 {
 	unsigned long priv = (unsigned long)wqe->private;
@@ -63,6 +92,18 @@ static inline struct io_kiocb *wqe_to_req(struct wait_queue_entry *wqe)
 	return (struct io_kiocb *)(priv & ~IO_WQE_F_DOUBLE);
 }
 
+/**
+ * wqe_is_double - Checks if a wait queue entry (wqe) is marked as double.
+ * @wqe: Pointer to the wait queue entry to be checked.
+ *
+ * This function examines the `private` field of the given wait queue entry
+ * and determines if the IO_WQE_F_DOUBLE flag is set. The flag indicates
+ * whether the wait queue entry is marked as double.
+ *
+ * Return:
+ * true  - If the IO_WQE_F_DOUBLE flag is set.
+ * false - Otherwise.
+ */
 static inline bool wqe_is_double(struct wait_queue_entry *wqe)
 {
 	unsigned long priv = (unsigned long)wqe->private;
@@ -70,6 +111,20 @@ static inline bool wqe_is_double(struct wait_queue_entry *wqe)
 	return priv & IO_WQE_F_DOUBLE;
 }
 
+/**
+ * io_poll_get_ownership_slowpath - Attempt to acquire ownership of a poll request
+ *                                  in a slowpath scenario.
+ * @req: Pointer to the io_kiocb structure representing the poll request.
+ *
+ * This function attempts to acquire ownership of a poll request when the
+ * poll_refs counter indicates contention. If the poll_refs counter is already
+ * elevated, it sets a retry flag (IO_POLL_RETRY_FLAG) to notify the loop that
+ * there might have been a change, instead of incrementing the counter directly.
+ *
+ * Return:
+ * - true: Ownership was successfully acquired.
+ * - false: Ownership could not be acquired due to contention.
+ */
 static bool io_poll_get_ownership_slowpath(struct io_kiocb *req)
 {
 	int v;
@@ -138,6 +193,19 @@ static void io_init_poll_iocb(struct io_poll *poll, __poll_t events)
 	init_waitqueue_func_entry(&poll->wait, io_poll_wake);
 }
 
+/**
+ * io_poll_remove_entry - Removes a poll entry from its wait queue.
+ * @poll: Pointer to the io_poll structure representing the poll entry.
+ *
+ * This function safely removes a poll entry from its associated wait queue
+ * if it is currently linked to one. It acquires the spinlock for the wait
+ * queue to ensure thread safety during the removal process. Once the entry
+ * is removed, the wait queue head pointer in the poll structure is set to
+ * NULL to indicate that it is no longer associated with any wait queue.
+ *
+ * The function uses smp_load_acquire to ensure proper memory ordering when
+ * accessing the wait queue head pointer.
+ */
 static inline void io_poll_remove_entry(struct io_poll *poll)
 {
 	struct wait_queue_head *head = smp_load_acquire(&poll->head);
@@ -190,6 +258,19 @@ enum {
 	IOU_POLL_REQUEUE = 4,
 };
 
+/**
+ * __io_poll_execute - Executes a poll request with the specified mask.
+ * @req: Pointer to the io_kiocb structure representing the request.
+ * @mask: The event mask to be applied to the poll request.
+ *
+ * This function sets the result of the poll request, assigns the task work
+ * function for the request, and adds the request to the task work queue.
+ * It also traces the addition of the task to the io_uring task system.
+ *
+ * If the request does not have the REQ_F_POLL_NO_LAZY flag set, the function
+ * adds the IOU_F_TWQ_LAZY_WAKE flag to the task work queue addition, enabling
+ * lazy wake-up behavior.
+ */
 static void __io_poll_execute(struct io_kiocb *req, int mask)
 {
 	unsigned flags = 0;
@@ -204,6 +285,16 @@ static void __io_poll_execute(struct io_kiocb *req, int mask)
 	__io_req_task_work_add(req, flags);
 }
 
+/**
+ * io_poll_execute - Executes a poll operation if the request has ownership.
+ * @req: Pointer to the io_kiocb structure representing the I/O request.
+ * @res: Result of the poll operation, typically a status code or event count.
+ *
+ * This function checks if the current I/O request has ownership by calling
+ * io_poll_get_ownership(). If ownership is confirmed, it proceeds to execute
+ * the poll operation by invoking __io_poll_execute() with the given request
+ * and result.
+ */
 static inline void io_poll_execute(struct io_kiocb *req, int res)
 {
 	if (io_poll_get_ownership(req))
@@ -712,8 +803,20 @@ int io_arm_poll_handler(struct io_kiocb *req, unsigned issue_flags)
 	return IO_APOLL_OK;
 }
 
-/*
- * Returns true if we found and killed one or more poll requests
+/**
+ * io_poll_remove_all - Removes all poll requests from the io_uring context.
+ *
+ * This function iterates through all hash buckets in the cancel table and removes
+ * all poll requests associated with the given task context. It ensures that the
+ * requests are properly disarmed and canceled.
+ *
+ * @ctx: The io_uring context.
+ * @tctx: The task context for which poll requests should be removed.
+ * @cancel_all: A flag indicating whether to cancel all requests or only specific ones.
+ *
+ * Returns:
+ * - true if one or more poll requests were removed.
+ * - false if no poll requests were found.
  */
 __cold bool io_poll_remove_all(struct io_ring_ctx *ctx, struct io_uring_task *tctx,
 			       bool cancel_all)
@@ -740,6 +843,19 @@ __cold bool io_poll_remove_all(struct io_ring_ctx *ctx, struct io_uring_task *tc
 	return found;
 }
 
+/**
+ * io_poll_find - Finds a poll request in the io_uring context.
+ *
+ * This function searches for a poll request in the cancel table based on the
+ * provided cancel data. It can optionally filter by poll-only requests.
+ *
+ * @ctx: The io_uring context.
+ * @poll_only: A flag indicating whether to search only for poll requests.
+ * @cd: The cancel data containing the search parameters.
+ *
+ * Returns:
+ * - A pointer to the found poll request, or NULL if no matching request is found.
+ */
 static struct io_kiocb *io_poll_find(struct io_ring_ctx *ctx, bool poll_only,
 				     struct io_cancel_data *cd)
 {
@@ -761,6 +877,18 @@ static struct io_kiocb *io_poll_find(struct io_ring_ctx *ctx, bool poll_only,
 	return NULL;
 }
 
+/**
+ * io_poll_file_find - Finds a poll request associated with a file in the io_uring context.
+ *
+ * This function searches for a poll request in the cancel table that matches the
+ * provided cancel data and is associated with a specific file.
+ *
+ * @ctx: The io_uring context.
+ * @cd: The cancel data containing the search parameters.
+ *
+ * Returns:
+ * - A pointer to the found poll request, or NULL if no matching request is found.
+ */
 static struct io_kiocb *io_poll_file_find(struct io_ring_ctx *ctx,
 					  struct io_cancel_data *cd)
 {
@@ -779,6 +907,19 @@ static struct io_kiocb *io_poll_file_find(struct io_ring_ctx *ctx,
 	return NULL;
 }
 
+/**
+ * io_poll_disarm - Disarms a poll request.
+ *
+ * This function removes a poll request from its associated wait queue and hash table,
+ * effectively disarming it. It ensures that the request is no longer active.
+ *
+ * @req: The poll request to be disarmed.
+ *
+ * Returns:
+ * - 0 on success.
+ * - -ENOENT if the request is NULL.
+ * - -EALREADY if the request is not owned.
+ */
 static int io_poll_disarm(struct io_kiocb *req)
 {
 	if (!req)
@@ -790,6 +931,19 @@ static int io_poll_disarm(struct io_kiocb *req)
 	return 0;
 }
 
+/**
+ * __io_poll_cancel - Cancels a poll request.
+ *
+ * This function searches for a poll request in the cancel table and cancels it
+ * if found. It ensures that the request is properly disarmed and marked as canceled.
+ *
+ * @ctx: The io_uring context.
+ * @cd: The cancel data containing the search parameters.
+ *
+ * Returns:
+ * - 0 on success.
+ * - -ENOENT if no matching request is found.
+ */
 static int __io_poll_cancel(struct io_ring_ctx *ctx, struct io_cancel_data *cd)
 {
 	struct io_kiocb *req;
@@ -807,6 +961,21 @@ static int __io_poll_cancel(struct io_ring_ctx *ctx, struct io_cancel_data *cd)
 	return -ENOENT;
 }
 
+/**
+ * io_poll_cancel - Cancels a poll request for io_uring.
+ *
+ * This function locks the io_uring context, cancels a poll request using the
+ * provided cancel data, and then unlocks the context. It ensures thread safety
+ * during the cancellation process.
+ *
+ * @ctx: The io_uring context.
+ * @cd: The cancel data containing the search parameters.
+ * @issue_flags: Flags indicating the context in which the operation is issued.
+ *
+ * Returns:
+ * - 0 on success.
+ * - Negative error code on failure.
+ */
 int io_poll_cancel(struct io_ring_ctx *ctx, struct io_cancel_data *cd,
 		   unsigned issue_flags)
 {
@@ -818,6 +987,22 @@ int io_poll_cancel(struct io_ring_ctx *ctx, struct io_cancel_data *cd,
 	return ret;
 }
 
+/**
+ * io_poll_parse_events - Parse and process poll events from an io_uring SQE.
+ * 
+ * @sqe: Pointer to the io_uring submission queue entry containing poll events.
+ * @flags: Flags that modify the behavior of the poll operation.
+ * 
+ * This function extracts the poll events from the provided submission queue
+ * entry (SQE) and processes them based on the specified flags. It ensures
+ * compatibility with big-endian systems by swapping the byte order of the
+ * events if necessary. The function also applies additional event modifiers
+ * such as EPOLLONESHOT and EPOLLET based on the provided flags.
+ * 
+ * Return:
+ * A processed set of poll events, including any additional modifiers, ready
+ * for use in the io_uring polling mechanism.
+ */
 static __poll_t io_poll_parse_events(const struct io_uring_sqe *sqe,
 				     unsigned int flags)
 {
@@ -835,6 +1020,20 @@ static __poll_t io_poll_parse_events(const struct io_uring_sqe *sqe,
 		(events & (EPOLLEXCLUSIVE|EPOLLONESHOT|EPOLLET));
 }
 
+/**
+ * io_poll_remove_prep - Prepares a poll removal request for io_uring.
+ *
+ * This function initializes the necessary parameters for removing or updating
+ * a poll request based on the submission queue entry (SQE). It validates the
+ * input and sets up the update parameters if needed.
+ *
+ * @req: The I/O request to be prepared.
+ * @sqe: The submission queue entry containing the removal/update parameters.
+ *
+ * Returns:
+ * - 0 on success.
+ * - Negative error code on invalid input.
+ */
 int io_poll_remove_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 {
 	struct io_poll_update *upd = io_kiocb_to_cmd(req, struct io_poll_update);
@@ -865,6 +1064,20 @@ int io_poll_remove_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 	return 0;
 }
 
+/**
+ * io_poll_add_prep - Prepares a poll request for io_uring.
+ *
+ * This function initializes the necessary parameters for a poll request based on
+ * the submission queue entry (SQE). It validates the input and sets up the poll
+ * events to be monitored.
+ *
+ * @req: The I/O request to be prepared.
+ * @sqe: The submission queue entry containing the poll parameters.
+ *
+ * Returns:
+ * - 0 on success.
+ * - Negative error code on invalid input.
+ */
 int io_poll_add_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 {
 	struct io_poll *poll = io_kiocb_to_cmd(req, struct io_poll);
@@ -882,6 +1095,19 @@ int io_poll_add_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 	return 0;
 }
 
+/**
+ * io_poll_add - Adds a poll request to the io_uring context.
+ *
+ * This function prepares and arms a poll request for monitoring events on a file
+ * descriptor. It uses the io_uring framework to efficiently manage the poll operation.
+ *
+ * @req: The I/O request to be added.
+ * @issue_flags: Flags indicating the context in which the operation is issued.
+ *
+ * Returns:
+ * - IOU_OK if the poll request is successfully added.
+ * - Negative error code on failure.
+ */
 int io_poll_add(struct io_kiocb *req, unsigned int issue_flags)
 {
 	struct io_poll *poll = io_kiocb_to_cmd(req, struct io_poll);
@@ -898,6 +1124,21 @@ int io_poll_add(struct io_kiocb *req, unsigned int issue_flags)
 	return ret ?: IOU_ISSUE_SKIP_COMPLETE;
 }
 
+/**
+ * io_poll_remove - Removes a poll request from the io_uring context.
+ *
+ * This function disarms and removes a poll request identified by its user data.
+ * If the poll request needs to be updated (events or user data), it reinitializes
+ * the poll request with the new parameters. If the update fails, the request is
+ * marked as failed.
+ *
+ * @req: The I/O request to be removed or updated.
+ * @issue_flags: Flags indicating the context in which the operation is issued.
+ *
+ * Returns:
+ * - IOU_OK on success.
+ * - Negative error code on failure.
+ */
 int io_poll_remove(struct io_kiocb *req, unsigned int issue_flags)
 {
 	struct io_poll_update *poll_update = io_kiocb_to_cmd(req, struct io_poll_update);

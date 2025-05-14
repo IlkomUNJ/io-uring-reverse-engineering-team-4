@@ -33,11 +33,25 @@ struct io_msg {
 	u32 flags;
 };
 
+/**
+ * This function releases the lock held on the uring_lock mutex within the
+ * specified io_ring_ctx structure. It is intended to be used when the lock
+ * needs to be released to allow other threads to access the critical section
+ * protected by this mutex.
+ */
 static void io_double_unlock_ctx(struct io_ring_ctx *octx)
 {
 	mutex_unlock(&octx->uring_lock);
 }
 
+/**
+ * This function attempts to lock the uring_lock mutex of the target
+ * io_uring context (`octx`). If the `IO_URING_F_UNLOCKED` flag is not set
+ * in `issue_flags`, it tries to acquire the lock using `mutex_trylock`.
+ * If the trylock fails, it returns `-EAGAIN` to indicate that the lock
+ * could not be acquired immediately. Otherwise, it acquires the lock
+ * using `mutex_lock`.
+ */
 static int io_lock_external_ctx(struct io_ring_ctx *octx,
 				unsigned int issue_flags)
 {
@@ -55,6 +69,12 @@ static int io_lock_external_ctx(struct io_ring_ctx *octx,
 	return 0;
 }
 
+/**
+ * This function is responsible for cleaning up resources allocated for an
+ * io_msg request. It retrieves the io_msg structure associated with the
+ * request and ensures that the source file reference is released. If the
+ * source file reference is invalid (NULL), a warning is triggered.
+ */
 void io_msg_ring_cleanup(struct io_kiocb *req)
 {
 	struct io_msg *msg = io_kiocb_to_cmd(req, struct io_msg);
@@ -66,11 +86,26 @@ void io_msg_ring_cleanup(struct io_kiocb *req)
 	msg->src_file = NULL;
 }
 
+/**
+ * This function checks whether the target context requires remote processing
+ * of a message by evaluating the `task_complete` field of the provided
+ * io_ring_ctx structure. If `task_complete` is true, the function returns true,
+ * indicating that remote processing is needed.
+ */
 static inline bool io_msg_need_remote(struct io_ring_ctx *target_ctx)
 {
 	return target_ctx->task_complete;
 }
 
+/**
+ * This function finalizes a two-way message operation by:
+ * 1. Adding an auxiliary completion queue entry (CQE) to the io_uring context.
+ * 2. Attempting to release the request object back to the message cache if the
+ *    spinlock on the message lock can be acquired.
+ * 3. Freeing the request object using the kernel memory cache if it was not
+ *    successfully returned to the message cache.
+ * 4. Decrementing the reference count on the io_uring context.
+ */
 static void io_msg_tw_complete(struct io_kiocb *req, io_tw_token_t tw)
 {
 	struct io_ring_ctx *ctx = req->ctx;
@@ -86,6 +121,13 @@ static void io_msg_tw_complete(struct io_kiocb *req, io_tw_token_t tw)
 	percpu_ref_put(&ctx->refs);
 }
 
+/**
+ * This function prepares and posts a remote message request to the specified
+ * io_uring context. It ensures that the submitter task is valid, initializes
+ * the request structure with the provided parameters, and adds the request
+ * to the task work queue for remote execution. If the submitter task is not
+ * valid, the request is freed, and an error code (-EOWNERDEAD) is returned.
+ */
 static int io_msg_remote_post(struct io_ring_ctx *ctx, struct io_kiocb *req,
 			      int res, u32 cflags, u64 user_data)
 {
@@ -104,6 +146,14 @@ static int io_msg_remote_post(struct io_ring_ctx *ctx, struct io_kiocb *req,
 	return 0;
 }
 
+/**
+ * This function attempts to allocate an io_kiocb structure for use in
+ * message handling. It first tries to acquire the message lock and fetch
+ * a pre-allocated io_kiocb from the message cache. If successful, it
+ * releases the lock and returns the allocated structure. If the cache
+ * does not contain a pre-allocated structure, it falls back to allocating
+ * a new io_kiocb from the kernel memory cache with specific flags.
+ */
 static struct io_kiocb *io_msg_get_kiocb(struct io_ring_ctx *ctx)
 {
 	struct io_kiocb *req = NULL;
@@ -117,6 +167,11 @@ static struct io_kiocb *io_msg_get_kiocb(struct io_ring_ctx *ctx)
 	return kmem_cache_alloc(req_cachep, GFP_KERNEL | __GFP_NOWARN | __GFP_ZERO);
 }
 
+/**
+ * This function retrieves a target io_kiocb structure from the target context
+ * and posts a remote message to it. If the IORING_MSG_RING_FLAGS_PASS flag is
+ * set in the message, the cqe_flags from the message are passed along.
+ */
 static int io_msg_data_remote(struct io_ring_ctx *target_ctx,
 			      struct io_msg *msg)
 {
@@ -134,6 +189,12 @@ static int io_msg_data_remote(struct io_ring_ctx *target_ctx,
 					msg->user_data);
 }
 
+/**
+ * This function processes a message ring operation by validating the input
+ * parameters, checking the target context's state, and posting a completion
+ * queue event (CQE) if necessary. It supports both local and remote message
+ * handling based on the target context's configuration.
+ */
 static int __io_msg_ring_data(struct io_ring_ctx *target_ctx,
 			      struct io_msg *msg, unsigned int issue_flags)
 {
@@ -165,6 +226,11 @@ static int __io_msg_ring_data(struct io_ring_ctx *target_ctx,
 	return ret;
 }
 
+/**
+ * This function retrieves the target io_ring_ctx from the provided request's file
+ * private data and converts the request into an io_msg structure. It then delegates
+ * the actual data handling to the __io_msg_ring_data function.
+ */
 static int io_msg_ring_data(struct io_kiocb *req, unsigned int issue_flags)
 {
 	struct io_ring_ctx *target_ctx = req->file->private_data;
